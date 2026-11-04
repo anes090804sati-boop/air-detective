@@ -1,0 +1,9 @@
+{
+  "name": "air-detective-pnet01",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"start":"node server.js"},
+  "dependencies": {"dotenv":"^16.4.7","express":"^4.21.2","openai":"^6.0.0"},
+  "engines": {"node":">=20"}
+}
