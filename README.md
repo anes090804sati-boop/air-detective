@@ -1,64 +1,52 @@
-# Air Detective — P-NET 01 (갈색 테마 / 웹 배포용)
+# Air Detective — P-NET 01 · 무료 분석 + 상세 핫스팟 지도
 
-공사장·도로 먼지 피해 기록, 지역 기상·대기질 모델 정보, OpenAI 사진/설명 분석, 민원 초안 및 시민 제보 지도를 제공하는 웹앱입니다.
+## 핵심 기능
+- 갈색/베이지 대시보드, 반응형 UI
+- **OpenAI API 없이 100% 코드 내 무료 규칙 기반 원인 추정**: 시민의 먼지 유형·설명·주변 바람 및 대기 모델값을 이용. 생성형 AI가 아니고 사진을 자동 해석하지 않습니다.
+- **Open-Meteo** 지역 PM10·PM2.5 모델 데이터와 기상 정보 (대상 지점의 직접 측정 아님)
+- 제보 후 민원 초안 생성·수정·복사·TXT 내려받기
+- **상세 제보 지도**: OSM 기반 확대/축소, 현재 위치, 주소 검색 결과 선택, 지도 클릭 위치 지정, 마커와 팝업, 제보 목록/찾기/정렬, 지도 영역 내 필터, 유형·기간·출처 필터, 지도 전체 제보 보기, 일반/밝은 지도, 밀집도(Leaflet.heat), 지도 상태 통계, 내 제보 JSON 내보내기 및 기기 내 제보 삭제
 
-## 보안: 반드시 먼저 확인하세요
+### 지도와 정보 해석 시 주의
+- 마커와 히트맵은 **시민 제보 수·위치**이지 미세먼지 농도, 법 위반, 건강 위험도를 뜻하지 않습니다.
+- 지도에 저장하는 좌표는 소수 셋째 자리(약 100m 단위)로 반올림합니다. 사진은 공유 저장하지 않습니다. 입력 설명에 개인정보를 넣지 마세요.
+- 오픈 지도/주소 검색/기상 데이터는 외부 무료 서비스의 이용 정책과 트래픽 제한의 영향을 받습니다. 영구 무제한 운영을 보장하지 않습니다.
+- 사진은 브라우저에서만 미리보기되며 자동 분석하거나 공유되지 않습니다.
 
-- 채팅/공개 저장소 등에 올린 OpenAI API 키는 **즉시 폐기(Revoke)** 하고 새 키를 만드세요.
-- **키를 채팅으로 전송하거나 `index.html`/`script.js`/GitHub에 넣지 마세요.**
-- 새 키는 Vercel 프로젝트의 **Settings → Environment Variables → `OPENAI_API_KEY`** 에만 입력하세요.
-- 공개 앱은 AI 요청 비용을 발생시킵니다. OpenAI 사용량 한도를 설정하고 Vercel Firewall/CAPTCHA 등 악용 방어를 추가하세요. 현재 간단한 메모리 기반 요청 제한은 서버리스 환경에서 완전한 방어가 아닙니다.
+## Vercel + GitHub 기존 프로젝트 업데이트
+1. ZIP을 압축 해제하세요.
+2. 기존 GitHub 저장소 `air-detective`의 루트에 압축 해제한 **모든 파일/폴더를 동일한 경로로 덮어씁니다**. `index.html`, `style.css`, `script.js`, `server.js`, `api/index.js`, `vercel.json`, `package.json`, `supabase.sql`, `README.md` 등. 새 폴더 하나만 올리면 웹 루트가 잘못될 수 있습니다.
+3. GitHub에서 `Commit changes`를 누르세요. 연결된 Vercel 프로젝트는 변경 사항을 자동 재배포합니다.
+4. Vercel Deployments에서 Ready 확인 후 `https://air-detective.vercel.app`을 열고 강력 새로고침(Ctrl+Shift+R)하세요.
+5. 이미 Vercel에 설정한 `OPENAI_API_KEY`는 **이번 버전에서 필요 없으므로 제거**할 수 있습니다. 과거 채팅으로 공개된 키는 OpenAI 대시보드에서 반드시 폐기하세요.
+6. Vercel 로그인 없이 공개하려면 Project Settings → Deployment Protection에서 **Production 도메인 공개**가 되도록 Standard Protection/None(현재 요금제 선택지에 따름)으로 설정하세요.
 
-## Vercel에 배포
+## 제보 공유 기능 (선택)
+서버와 OpenAI API 키 없이도 무료 분석·지도 탐색·내 기기 제보 기능은 작동합니다.
 
-1. 이 폴더 내용을 새 **GitHub 비공개 저장소**에 업로드합니다. `.env` 파일은 업로드하지 마세요.
-2. https://vercel.com/new 에서 GitHub 저장소를 Import 합니다.
-3. Framework Preset은 **Other**, Root Directory는 파일이 들어 있는 폴더 루트, Build Command/Output Directory는 기본값으로 둡니다.
-4. **Settings → Environment Variables**에서 아래 값을 등록합니다.
-   - `OPENAI_API_KEY`: 새로 발급받은 OpenAI API 키(필수: AI 분석)
-   - `OPENAI_MODEL`: `gpt-4.1-mini` (선택)
-   - `SUPABASE_URL`: Supabase 프로젝트 URL(필수: 제보 공유)
-   - `SUPABASE_SERVICE_ROLE_KEY`: Supabase 서버 전용 `service_role` 키(필수: 제보 공유; 절대 브라우저에 노출 금지)
-   - `CONTACT_EMAIL`: Nominatim 사용 정책을 위한 실제 운영자 연락 이메일(주소 검색 시 권장)
-5. Supabase https://supabase.com 에서 프로젝트를 생성하고 SQL Editor에서 `supabase.sql`을 실행합니다.
-6. Vercel에서 **Deploy** 후 생성된 `https://...vercel.app` 링크를 공유합니다. 환경변수 추가/변경 시 **Redeploy** 해주세요.
+- 기본값(별도 DB 미설정): 공유되지 않고 **localStorage**에 내 기기에서만 저장됩니다. 다른 방문자에게 보이지 않으며 브라우저 삭제 시 사라집니다.
+- 모든 방문자가 공개 제보를 공유하려면 **Supabase 무료 플랜** 데이터베이스 연결이 필요합니다.
+  1. Supabase에서 프로젝트 만들기 → SQL Editor에서 `supabase.sql` 실행.
+  2. Vercel Project Settings → Environment Variables에 `SUPABASE_URL`과 `SUPABASE_SERVICE_ROLE_KEY`를 추가하고 Redeploy.
+  3. 비밀 키는 절대 GitHub·HTML·클라이언트 JS에 넣지 마세요.
+- DB 없이도 민원 초안 생성·환경 데이터 조회·지도 주소 검색은 가능하지만, Vercel의 API 라우트(`/api/geocode`)가 정상 배포되어야 주소 검색이 작동합니다.
+- 운영 환경에선 스팸 방지, 삭제 요청, 게시물 신고, 사용자 데이터 보호 및 서비스 이용 약관이 추가로 필요합니다. 현재 프로젝트는 학습·발표용 MVP입니다.
 
-**참고**: Supabase는 2026년 새로운 `sb_secret_...` 방식의 키를 제공합니다. 이 프로젝트는 기존 JWT 형식 `service_role` 키를 대상으로 REST API 요청을 작성했습니다. 프로젝트 대시보드에서 Legacy API Keys를 통해 발급되는지 확인하세요. 새 키 방식만 사용한다면 서버의 인증 헤더 처리를 그 방식에 맞게 변경해야 합니다.
-
-### 테스트
-
-- 배포 주소에서 `/api/health`를 열면 `aiReady`와 `reportsReady` 확인 가능
-- `aiReady: true` = OpenAI 서버 설정 완료
-- `reportsReady: true` = Supabase 관련 환경변수 존재(실제 테이블/권한 검사는 별도)
-- 사이트에서 지역 검색, AI 분석, 제보 공유가 동작하는지 직접 확인하세요.
-
-## 로컬 실행
-
-Node.js 20 이상 필요:
-
-```bash
+## 로컬 개발
+Node.js 20 이상에서
+```
 npm install
-cp .env.example .env  # Windows에서는 복사 명령이나 탐색기 사용
-# .env에 키 입력
 npm start
 ```
+접속: `http://localhost:3000`
 
-브라우저에서 http://localhost:3000 접속. 로컬에서 Supabase가 없을 경우 제보를 `reports.json`에 임시 저장합니다. Vercel에서는 데이터베이스 없는 제보 공유를 차단해 휘발성 저장을 방지합니다.
+## 파일
+- `index.html` 화면 구조
+- `style.css` 갈색 테마 및 지도 레이아웃
+- `script.js` 무료 규칙 분석, Open-Meteo, Leaflet 상세 지도, 민원 기능
+- `server.js` Express 서버와 서버 경유 Nominatim 주소 검색 / 선택적 제보 공유
+- `api/index.js` Vercel 서버 함수 진입점
+- `vercel.json` `/api/` 재작성
+- `supabase.sql` Supabase 선택 설정
 
-## 데이터 / 제약
-
-- **Open-Meteo**: PM10·PM2.5 및 기상 정보(지역 모델/자료, 현장 실측 아님). 서비스 이용 약관과 API 제한을 확인하세요.
-- **OpenStreetMap/Leaflet**: 지도, **Nominatim**: 주소 검색. 공개 서비스는 제공자 사용 정책·호출 한도를 준수해야 합니다.
-- **AirKorea 연동 미구현**: 현재 앱의 PM 수치를 AirKorea 관측소 값으로 오인하면 안 됩니다.
-- **공개 지도**: 공유 동의 시 제보 장소·유형·설명·좌표(소수 셋째 자리 반올림)를 저장·공개합니다. 사진은 저장하거나 공개하지 않습니다. 개인 신원, 상세 주소 및 민감정보가 설명에 들어가지 않도록 주의하세요.
-- AI 원인 분석은 추정이며 법 위반·실측 오염을 확정하지 않습니다. 민원은 초안만 제공합니다.
-- **현재 상태: 시연용 MVP**. 실제 시민 대상 서비스 운영에는 제보 삭제 및 신고 처리, 부적절한 게시물 차단, 악용 방지, 보존 기간·개인정보 안내 등이 추가로 필요합니다.
-
-## 폴더
-
-- `index.html` — 메인 화면
-- `style.css` — 갈색/크림색 반응형 디자인
-- `script.js` — 지도, 데이터 호출, 사진 선택, 민원 작성
-- `server.js` — Express API, OpenAI, Supabase REST
-- `api/index.js` + `vercel.json` — Vercel 서버리스 라우팅
-- `supabase.sql` — 공유 제보 테이블 생성
+무료 분석은 AI 모델 추론이 아닙니다. 분석 결과를 확정적 진단·법 위반 판정으로 사용하지 마세요.
