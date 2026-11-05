@@ -1,19 +1,16 @@
-
 name: Build facility snapshot
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/build-facilities.yml'
-      - 'scripts/build_facilities.py'
-      - 'scripts/check_snapshot.py'
   schedule:
     - cron: '0 3 * * 1'
 
 permissions:
   contents: write
+
+concurrency:
+  group: air-detective-facilities-main
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -23,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -48,14 +47,33 @@ jobs:
       - name: Verify facility data
         run: python scripts/check_snapshot.py data/facilities.json
 
-      - name: Commit facility data
+      - name: Commit facility data safely
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/facilities.json
-          if ! git diff --cached --quiet; then
+
+          cp data/facilities.json "$RUNNER_TEMP/facilities.json"
+          for attempt in 1 2 3 4 5; do
+            echo "Publishing attempt $attempt/5"
+            git fetch origin main
+            # Only reset the disposable runner's local checkout; never force-push.
+            git reset --hard origin/main
+            mkdir -p data
+            cp "$RUNNER_TEMP/facilities.json" data/facilities.json
+            git add data/facilities.json
+            if git diff --cached --quiet; then
+              echo 'Facility data already up to date.'
+              exit 0
+            fi
             git commit -m 'Update facility snapshot'
-            git push origin HEAD:main
-          else
-            echo 'Facility data is unchanged.'
-          fi
+            if git push origin HEAD:main; then
+              echo 'Facility snapshot published.'
+              exit 0
+            fi
+            echo 'Remote changed during publishing; retrying against latest main.'
+            sleep 3
+          done
+          echo 'Could not publish after 5 attempts.' >&2
+          exit 1
