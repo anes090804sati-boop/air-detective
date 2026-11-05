@@ -14,7 +14,7 @@ function allowedQuery(q){
  const stripped=q.replace(VALID_TAGS,'').replace(/\[out:json\]\[timeout:\d{1,2}\];|nwr|around|out center|[-+0-9.,;:()\s]/g,'');
  return !stripped && !/[<>]/.test(q);
 }
-module.exports=async (req,res)=>{
+export default async function handler(req,res) {
  res.setHeader('Content-Type','application/json; charset=utf-8');
  res.setHeader('Access-Control-Allow-Origin','https://air-detective.vercel.app');
  if(req.method!=='POST')return res.status(405).json({error:'POST만 허용합니다.'});
