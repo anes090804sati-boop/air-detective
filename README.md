@@ -1,27 +1,35 @@
-# Air Detective — P-NET 01 | 지도 없는 무료 버전
+# Air Detective V4.7 — 시설 마커 조회 실패 진단 + Vercel 중계 API
 
-## 포함 기능
-- 갈색/베이지 반응형 디자인
-- 지역/주소 검색과 현재 위치 기반 Open-Meteo PM10, PM2.5 및 날씨 조회
-- 먼지 피해 장소·유형·설명·증거 사진 선택 및 미리보기
-- 무료 규칙 기반 먼지 원인 추정 (OpenAI API, 비용, 크레딧 불필요)
-- 민원 초안 생성·수정·복사·TXT 다운로드
+## 발견한 문제
+- 기존 지도 이미지는 OSM 타일로 정상 표시되지만, 실제 **시설 위치 마커는 별도 Overpass 요청**에 달려 있습니다.
+- V4.6은 브라우저에서 외부 Overpass 서버에 CORS가 필요한 POST를 직접 보냈고, 혼잡하거나 접근이 안 되는 호스트를 우선 사용했습니다.
+- 따라서 지도에는 내 위치만 보이면서도 사용자가 데이터 조회 실패 원인을 알기 어려웠습니다.
 
-## 제거된 기능
-- 핫스팟 지도 전체, 지도 관련 메뉴, 지도 SDK(Leaflet), 지도 마커 및 히트맵
-- 제보 공유 및 위치를 지도에 저장하는 옵션
-- 제보는 기본적으로 서버에 저장되지 않습니다. 사진은 브라우저 미리보기용이며 AI 판독하지 않습니다.
+## 변경 사항
+- `api/facilities.js` **신규 필수 파일**: Vercel 서버 측에서 Overpass API로 시설 데이터를 요청합니다. 무료이고 API 키가 필요하지 않습니다.
+- `vercel.json` **필수 교체**: `/api/facilities`를 위 Vercel 서버 함수에 연결합니다.
+- `script.js`: 중계 API 먼저 사용하고 실패 시 다른 공개 Overpass 서버 직접 요청을 보조적으로 시도합니다.
+- 지도 상태에 **성공 / 조회된 OSM 원본 객체 수 / 실제 표시 수 / 실패 원인**을 명확하게 보입니다.
+- 지도 스타일, 분석 결과, 사진 인식, 민원 초안은 기존 V4.6을 유지합니다.
 
-## 기존 GitHub/Vercel 배포 업데이트
-1. ZIP 파일을 압축 해제합니다.
-2. GitHub `air-detective` 저장소의 루트에 `index.html`, `style.css`, `script.js`, `README.md`를 새 파일로 교체하고 커밋합니다. `api/index.js`, `server.js`, `package.json`, `vercel.json`도 동봉되어 있으므로 필요하면 함께 교체합니다.
-3. 기존 `supabase.sql`은 지도/공유 제보에만 사용했으므로 GitHub에서 제거해도 됩니다. 삭제하지 않더라도 웹 기능에는 영향을 주지 않습니다.
-4. Vercel Deployments에서 새 커밋이 Ready인지 확인 후 `https://air-detective.vercel.app`에서 Ctrl+Shift+R로 강력 새로고침합니다.
-5. OpenAI API 키와 Supabase 키는 이 버전에서 필요 없습니다. Vercel 환경변수에서 제거할 수 있습니다. 과거 채팅에 공개된 OpenAI 키는 폐기하세요.
+## 반드시 올려야 하는 파일
+GitHub 저장소 최상위에 다음의 **전체 경로**를 올려주세요.
+```
+index.html
+style.css
+script.js
+vercel.json
+api/facilities.js   <-- 새 파일, 반드시 업로드
+```
+GitHub의 Add file → Upload files에서 `api` **폴더까지 업로드**하여 `api/facilities.js`가 생기는지 꼭 확인합니다.
+배포 후 Vercel Deployments의 최신 배포가 Ready인지 확인합니다.
 
-## 주의
-- 규칙 기반 분석이지 사진을 판독하는 생성형 AI가 아닙니다.
-- Open-Meteo 데이터는 지역 모델값이며 특정 현장의 직접 측정값이 아닙니다.
-- 주소 검색에 `/api/geocode` 엔드포인트가 사용되므로 Vercel 서버 함수가 정상 동작해야 합니다.
+## 진단 절차
+1. 사이트를 강력 새로고침(Ctrl+Shift+R)한 뒤 지도 탭을 열어 **확대 수준 10 이상**으로 확대하세요.
+2. 오른쪽 `지도 상태`에 `✅ 조회 성공`과 `화면 안 N개 표시`, `OSM 원본 객체 수`가 출력되면 데이터가 도착한 것입니다.
+3. `⚠ 조회 성공 ... 0개`라면 서버 연결은 됐지만 현재 화면에 표시할 OSM 등록 시설이 없다는 뜻입니다. 주변 다른 지역에서 시험해 보세요.
+4. `❌ 시설 데이터 조회 실패`라면 서버 연결 오류입니다. Vercel → Logs와 업로드된 `api/facilities.js`, `vercel.json`을 확인하세요.
+5. `/api/facilities`를 브라우저에서 직접 열면 `POST만 허용합니다.`는 표시가 나오는 것이 정상입니다 (API가 배포된 것).
 
-로컬 실행: `npm install` 후 `npm start` (Node.js 20 이상)
+## 정직한 제약
+공사 관련 시설은 OSM 사용자 등록 데이터이며 **전국 실제 모든 공사장**이 아닙니다. 미등록, 폐공사, 현장 변경이 있을 수 있습니다. 무료 Overpass 서버가 모두 과부하되면 데이터가 0개가 아니라 **서버 오류**로 표시됩니다. 이 환경에서는 실제 사용자 브라우저와 Vercel에 대한 네트워크 연결이 불가능해 외부 서버 응답을 종단간 검증하지 못했습니다.

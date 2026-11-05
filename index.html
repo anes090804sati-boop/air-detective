@@ -1,52 +1,86 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#f4eee7" />
-  <title>Air Detective | P-NET 01</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
-
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f0e7"><meta name="description" content="P-NET 01 Air Detective: 먼지 피해 분석, 무료 사진 분석, 공식 민원 안내, 대기오염 관련 시설 지도">
+  <title>Air Detective V4.7 | P-NET 01</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
   <script src="script.js" defer></script>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <a href="#home" class="brand"><span class="brand-icon">◈</span><span>Air<span class="brand-accent">Detective</span><small>BY P-NET 01</small></span></a>
-      <p class="nav-caption">WORKSPACE</p>
-      <nav aria-label="주 메뉴">
-        <a href="#home" class="nav-link active" data-nav="home"><span>◫</span> 대시보드</a>
-        <a href="#report" class="nav-link" data-nav="report"><span>◎</span> 먼지 피해 제보</a>
-        <a href="#complaint" class="nav-link" data-nav="complaint"><span>▤</span> 민원 작성 도우미</a>
+  <div class="app-shell">
+    <header class="header">
+      <a class="logo" href="#problem" aria-label="Air Detective 홈"><span class="logo-emblem">✿</span><span class="logo-text">Air <strong>Detective</strong><small>BY P-NET 01 · CITIZEN SCIENCE</small></span></a>
+      <nav class="main-tabs" aria-label="메인 화면">
+        <button id="problemTab" class="main-tab selected" type="button" data-view="problem" aria-selected="true"><span>✎</span> 문제 분석</button>
+        <button id="mapTab" class="main-tab" type="button" data-view="map" aria-selected="false"><span>⌖</span> 오염원 지도</button>
       </nav>
-      <div class="sidebar-bottom"><div class="help-icon">✦</div><b>깨끗한 공기를 위한<br />작은 제보의 힘</b><p>현장의 먼지 문제를 기록하고 더 나은 동네를 만들어 보세요.</p><a href="#report" class="sidebar-button">지금 제보하기 ↗</a></div>
-      <div class="side-footer">© 2026 P-NET 01 · 환경 프로젝트</div>
-    </aside>
-
-    <div class="main-wrap">
-      <header class="topbar"><button type="button" id="menuToggle" class="mobile-menu" aria-label="메뉴 열기">☰</button><span class="breadcrumb">시민 참여형 대기오염 대응 서비스 <span>/</span> <strong>대시보드</strong></span><div class="top-actions"><span class="live-tag"><i></i> OPEN DATA</span><span class="avatar">PN</span></div></header>
-      <main class="content" id="home">
-        <div class="eyebrow">AIR QUALITY INTELLIGENCE <span>✦</span> P-NET 01 · CITIZEN SCIENCE</div>
-        <section class="hero"><div class="hero-copy"><span class="hero-chip">🍂 먼지 없는 동네를 위한 작은 시작</span><h1>우리 동네 먼지,<br /><em>이제 그냥 지나치지 마세요.</em></h1><p>공사장과 도로에서 발생하는 먼지 피해를 제보하고,<br />무료 원인 추정부터 민원 초안 작성까지 한 번에 해결하세요.</p><a class="primary-btn" href="#report">먼지 피해 제보하기 <span>↗</span></a></div><div class="hero-art" aria-hidden="true"><div class="orbit orbit-1"></div><div class="orbit orbit-2"></div><div class="bubble b1">PM 2.5 <span>● ● ●</span></div><div class="bubble b2">🔎</div><div class="city-art"><div class="building tall"></div><div class="building middle"></div><div class="building short"></div><div class="road"></div><div class="cloud cloud-1"></div><div class="cloud cloud-2"></div><div class="magnifier"></div></div></div></section>
-
-        <section class="section" aria-labelledby="conditionsTitle"><div class="section-heading"><div><span class="section-kicker">LIVE ENVIRONMENT</span><h2 id="conditionsTitle">우리 동네 대기 정보 <span class="subpill">Open-Meteo 모델 데이터</span></h2><p>지역이나 주소를 검색해 해당 지역의 대기·날씨를 확인하세요.</p></div><div class="location-search"><input id="locationQuery" type="search" placeholder="지역 또는 주소 검색 (예: 서울 종로구)" aria-label="지역 검색" /><button id="searchLocation" type="button">검색</button><button id="myLocation" class="locate" type="button" title="현재 위치" aria-label="현재 위치">⌖</button></div></div>
-          <div class="location-line"><span>📍</span><strong id="locationLabel">서울특별시청 부근 (초기 위치)</strong><span id="updatedAt">데이터 조회 전</span></div>
-          <div class="metric-grid"><article class="metric-card"><div class="metric-top"><span>미세먼지 PM10</span><span class="metric-symbol orange">◌</span></div><div class="metric-number"><strong id="pm10">--</strong><small>µg/m³</small></div><span class="status neutral" id="pm10Status">조회 중</span><div class="metric-foot">모델 기반 주변 지역 값</div></article><article class="metric-card"><div class="metric-top"><span>초미세먼지 PM2.5</span><span class="metric-symbol purple">◌</span></div><div class="metric-number"><strong id="pm25">--</strong><small>µg/m³</small></div><span class="status neutral" id="pm25Status">조회 중</span><div class="metric-foot">모델 기반 주변 지역 값</div></article><article class="metric-card"><div class="metric-top"><span>풍속 및 풍향</span><span class="metric-symbol blue">➤</span></div><div class="metric-number"><strong id="wind">--</strong><small>km/h</small></div><span class="status blue" id="windDir">조회 중</span><div class="metric-foot">현장 먼지 확산에 영향</div></article><article class="metric-card"><div class="metric-top"><span>기온 · 강수량</span><span class="metric-symbol green">☀</span></div><div class="metric-number"><strong id="temperature">--</strong><small>°C</small></div><span class="status green" id="rainfall">강수 -- mm</span><div class="metric-foot">Open-Meteo 기상 관측/모델 값</div></article></div>
-          <p class="data-note">ⓘ 이 수치는 Open-Meteo의 지역 대기질 모델 및 날씨 데이터입니다. 특정 공사장이나 도로의 먼지 농도를 직접 측정한 값이 아니며, AirKorea 측정망과도 구분됩니다.</p>
+      <div class="header-side"><span class="online-dot"></span> P-NET 01 <span class="header-leaf">❧</span></div>
+    </header>
+    <main>
+      <section id="problemView" class="view" aria-labelledby="problemTitle">
+        <section class="hero">
+          <div class="hero-copy"><span class="overline">AIR DETECTIVE / 01 — REPORT & ANALYZE</span><span class="micro-tag">✳ OUR PLANET, OUR NEIGHBORHOOD</span>
+            <h1 id="problemTitle">우리 동네 공기,<br><em>조금 더 자세히.</em></h1>
+            <p>사진과 생활 속 먼지 피해를 기록하고,<br>가능한 원인을 살펴본 뒤 알맞은 민원 창구까지 찾아보세요.</p>
+            <a href="#reportSection" class="button primary">현장 분석 시작하기 <span>↗</span></a>
+            <div class="hero-meta"><span>✦ 무료 사진 인식</span><span>✦ 위치 기반 주변 시설</span><span>✦ 민원 작성 도움</span></div>
+          </div>
+          <div class="hero-art" aria-hidden="true"><div class="hero-circle"></div><div class="plant pot1"><span class="stem"></span><i class="leaf l1"></i><i class="leaf l2"></i><i class="leaf l3"></i><i class="leaf l4"></i><i class="leaf l5"></i><b class="pot"></b></div><div class="plant pot2"><span class="stem"></span><i class="leaf l1"></i><i class="leaf l2"></i><i class="leaf l3"></i><i class="leaf l4"></i><b class="pot"></b></div><div class="hero-sticker">AIR<br>CARE <small>01</small></div><span class="art-label">small steps, cleaner air</span></div>
         </section>
-
-        <section class="section report-section" id="report"><div class="section-heading"><div><span class="section-kicker">REPORT & ANALYZE</span><h2>먼지 피해 제보 · 무료 원인 추정</h2><p>현장 설명·유형·기상 정보를 바탕으로 규칙에 따라 원인 가능성과 대응 방법을 정리합니다.</p></div><span class="step-pill">STEP 01 — 03</span></div>
-          <div class="report-layout"><form id="reportForm" class="panel form-panel"><div class="form-intro"><span class="form-num">01</span><div><h3>현장 정보 입력</h3><p>가능한 한 구체적으로 적어 주세요.</p></div></div><div class="field"><label for="reportLocation">피해 장소 <b>*</b></label><div class="field-row"><input id="reportLocation" type="text" placeholder="예: 서울시 종로구 세종대로 110 인근" required /><button id="useCurrentPoint" type="button" class="outline-btn">조회 지역 적용</button></div><small id="coordText">조회 지역 좌표: 37.5665, 126.9780</small></div><div class="field"><label for="dustType">먼지 발생 유형 <b>*</b></label><select id="dustType" required><option value="">유형을 선택하세요</option><option value="공사장 비산먼지">공사장 비산먼지</option><option value="도로 재비산먼지">도로 재비산먼지</option><option value="화물차·차량 먼지">화물차·차량 먼지</option><option value="철거·토사 운반">철거·토사 운반</option><option value="원인 불명">원인 불명</option></select></div><div class="field"><label for="damageDescription">피해 상황 설명 <b>*</b></label><textarea id="damageDescription" rows="5" maxlength="1500" required placeholder="언제부터, 어디서, 어떤 먼지가 발생했나요? 어떤 불편을 겪으셨나요?"></textarea><small>최대 1,500자 · 개인정보나 타인의 얼굴·차량번호는 입력하지 마세요.</small></div><div class="field"><label for="photoInput">현장 사진 <span class="optional">선택</span></label><label class="upload-zone" for="photoInput"><span id="photoIcon">▧</span><strong id="photoTitle">현장 사진 업로드</strong><small>클릭하여 이미지 선택 · JPG, PNG, WEBP · 5MB 이하</small><img id="photoPreview" alt="선택한 현장 사진 미리보기" hidden /></label><input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden /></div><p class="form-hint">제보 내용은 서버나 공개 지도에 게시되지 않습니다. 입력한 내용으로 분석과 민원 초안만 생성합니다.</p><button type="submit" id="analyzeButton" class="primary-btn block">✦ 무료로 오염 가능 원인 분석하기</button><p class="form-hint">분석 결과는 추정 정보로, 법적 증거나 공인 측정 결과가 아닙니다.</p></form>
-          <div class="results-col"><div class="panel analysis-panel"><div class="form-intro"><span class="form-num ai">✦</span><div><h3>무료 현장 분석 리포트</h3><p>현장 설명·유형·기상 데이터를 참고합니다. 사진은 자동 판독하지 않습니다.</p></div></div><div id="analysisEmpty" class="empty-state"><span class="empty-illustration">⌕</span><h4>제보 내용을 입력해 주세요</h4><p>왼쪽 양식을 작성하고 분석 버튼을 누르면<br />원인 추정과 실천 가이드가 표시됩니다.</p></div><div id="analysisResult" class="analysis-result" hidden><span class="result-label" id="analysisMode">무료 분석</span><h4 id="analysisHeading"></h4><p id="analysisSummary"></p><h5>발생 가능 원인</h5><ul id="analysisCauses"></ul><h5>권장 대응 방법</h5><ol id="analysisActions"></ol><p class="caution">⚠ 현장 설명과 주변 기상 데이터만으로 오염 원인이나 위반 사실을 확정할 수 없습니다. 실제 조사는 관할 기관이 진행합니다.</p><a href="#complaint" class="outline-btn full-link">이 내용으로 민원 초안 확인 ↗</a></div></div><div class="tip-panel"><div>💡</div><div><strong>효과적인 제보 TIP</strong><p>먼지가 발생한 시간, 작업 종류, 바람 방향, 반복 여부를 기록하면 상황을 설명하는 데 도움이 됩니다.</p></div></div></div></div>
+        <section class="data-panel" aria-labelledby="envTitle"><div class="section-head"><div><span class="eyebrow">LOCAL CONDITIONS</span><h2 id="envTitle">내 주변 대기·날씨</h2><p>지역 단위 모델 값입니다. 특정 공사장의 실측 농도가 아닙니다.</p></div><div class="location-controls"><input id="locationQuery" placeholder="지역 또는 주소 검색" aria-label="지역 검색"><button type="button" id="searchLocation" class="small-button">검색</button><button type="button" id="myLocation" class="small-button outline">⌖ 내 위치</button></div></div><div class="location-caption"><span id="locationName">서울특별시청 근처 · 시작 위치</span><span id="updatedAt">조회 준비 중</span></div><div class="metrics"><article class="metric"><span>PM10 미세먼지</span><strong id="pm10">--</strong><small>µg/m³</small></article><article class="metric"><span>PM2.5 초미세먼지</span><strong id="pm25">--</strong><small>µg/m³</small></article><article class="metric"><span>풍속</span><strong id="windSpeed">--</strong><small>km/h</small></article><article class="metric"><span>풍향 · 강수</span><strong id="windDirection">--</strong><small id="rain">강수 -- mm</small></article></div><p class="fine-print">ⓘ Open-Meteo 대기질 모델·기상 데이터. 데이터 갱신 주기와 실제 현장 상황은 다를 수 있습니다.</p></section>
+        <section class="report-section" id="reportSection"><div class="section-head"><div><span class="eyebrow">FIELD NOTE / 02</span><h2>문제 기록하기</h2><p>제보 내용과 사진을 분석해 가능한 원인을 정리합니다.</p></div><span class="pill">STEP 01 — 02</span></div>
+          <div class="report-grid"><form id="reportForm" class="paper-card" novalidate><div class="card-top"><span class="step-circle">01</span><div><h3>현장 정보 입력</h3><p>관찰한 상황 그대로 작성해 주세요.</p></div></div>
+            <label for="siteLocation">피해 장소 <b>*</b></label><div class="input-inline"><input id="siteLocation" required placeholder="예: 서울 ○○구 ○○로 주변"><button id="applyLocation" type="button" class="small-button outline">조회 위치 사용</button></div><span class="field-hint" id="coordinateHint">분석 기준 좌표: 서울시청 (초기값)</span>
+            <label for="dustType">의심되는 먼지 유형 <b>*</b></label><select id="dustType" required><option value="">먼지 유형 선택</option><option value="construction">공사장·토사 비산먼지</option><option value="road">도로 재비산먼지</option><option value="vehicle">화물차·차량 먼지</option><option value="demolition">철거·절단 작업</option><option value="unknown">원인을 잘 모르겠어요</option></select>
+            <label for="description">목격한 상황과 불편사항 <b>*</b></label><textarea id="description" required rows="5" maxlength="1600" placeholder="예: 집 앞 공사장에서 트럭이 지나갈 때마다 흙먼지가 날려요. 오전 9시부터 창문을 열기 힘들어요."></textarea>
+            <label for="photoInput">현장 사진 <span class="optional">선택 사항</span></label><div class="photo-drop"><input type="file" id="photoInput" accept="image/png,image/jpeg,image/webp" hidden><button id="photoSelect" type="button" class="upload-button"><span class="photo-symbol">▧</span><strong>현장 사진을 추가하세요</strong><small>JPG · PNG · WEBP / 최대 6MB</small></button><img id="photoPreview" alt="현장 사진 미리보기" hidden><button id="removePhoto" type="button" class="photo-remove" hidden>사진 제거 ×</button></div>
+            <label class="switch-line"><input type="checkbox" id="photoConsent" checked><span>무료 사진 인식 모델 사용 (브라우저 내 분석, 최초 모델 다운로드 필요)</span></label>
+            <p class="mini-note">사진은 서버에 제출하거나 저장하지 않습니다. 사진 인식은 선택된 장면과의 유사도를 비교하며 오염 농도·불법 여부를 확인하지 않습니다.</p>
+            <button class="button primary full" id="analyzeButton" type="submit" aria-controls="analysisResult analysisLoading">✳ 현장 분석 시작하기 <span>↗</span></button><p class="form-status" id="formStatus" role="status"></p>
+          </form>
+          <div class="report-right"><article class="paper-card analysis-card"><div class="card-top"><span class="step-circle sage">✳</span><div><h3>현장 분석 리포트</h3><p>현장 설명 · 사진 인식 · 주변 환경 정보를 종합</p></div></div><div id="analysisEmpty" class="empty-analysis"><div class="empty-plant">❧</div><h3>어떤 상황이 있었나요?</h3><p>왼쪽에서 장소와 피해 상황을 입력하고 분석을 시작하면 보고서가 만들어져요.</p></div><div id="analysisLoading" class="analysis-loading" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <div class="analysis-loader-icon" aria-hidden="true"><span>✳</span></div>
+  <span class="loader-kicker">AIR DETECTIVE · FIELD REVIEW</span>
+  <h3>현장을 살펴보고 있어요</h3>
+  <p id="analysisLoadingText">입력한 내용을 확인하는 중입니다…</p>
+  <div class="loader-progress" aria-hidden="true"><span></span></div>
+  <div class="loader-stages" aria-hidden="true"><span id="loaderStage1" class="stage-current">01 · 위치 확인</span><span id="loaderStage2">02 · 주변 시설·사진 확인</span><span id="loaderStage3">03 · 보고서 작성</span></div>
+  <p class="loader-note">무료 분석은 인터넷 연결과 사진 모델 다운로드 상황에 따라 시간이 달라질 수 있어요.</p>
+</div><div id="analysisResult" class="analysis-result" hidden>
+            <div class="report-meta"><span class="pill green">무료 현장 분석</span><span id="analysisTime"></span></div>
+            <div class="analysis-block"><span class="index-number">01 / 현장 상황 추정</span><h4>현재 어떤 상황으로 보이나요?</h4><p id="situationText"></p><div id="nearbyBrief" class="nearby-brief"></div></div>
+            <div class="analysis-block"><span class="index-number">02 / 오염 가능 요인</span><h4>주변에서 영향을 줄 수 있는 요소</h4><ul id="causeList" class="cause-list"></ul></div>
+            <div class="analysis-block"><span class="index-number">03 / 종합 분석</span><h4>상황을 종합하면</h4><p id="summaryText"></p><p id="imageFinding" class="image-finding"></p></div>
+            <div class="analysis-block"><span class="index-number">04 / 대응 방법</span><h4>이렇게 대응해 보세요</h4><ol id="actionList" class="action-list"></ol></div>
+            <p class="analysis-disclaimer">※ 사진 인식은 장면 유사도 추정이며, 공개 지도 데이터는 누락되거나 오래되었을 수 있습니다. 관찰·추정·실측은 서로 다릅니다.</p><a class="button subtle full" href="#complaintSection">민원 초안 및 접수처 보기 ↗</a></div></article><div class="tip-card"><span>✦</span><p><strong>기록 팁</strong> 시간·장소·작업 모습과 발생 빈도를 적고, 안전한 곳에서 촬영하면 좋아요.</p></div></div></div>
         </section>
-
-        <section class="section complaint-section" id="complaint"><div class="section-heading"><div><span class="section-kicker">CIVIC ACTION ASSISTANT</span><h2>민원 초안 작성 도우미</h2><p>제보를 기반으로 복사해서 수정할 수 있는 민원 내용을 만들어 드립니다.</p></div><span class="step-pill">SUBMIT YOUR VOICE</span></div><div class="complaint-grid"><div class="panel guide-panel"><span class="guide-icon">✉</span><h3>어디에 민원을 제출하나요?</h3><p>관할 시·군·구 환경 관련 부서 또는 국민신문고에서 접수할 수 있습니다. 정확한 담당 부서는 지역에 따라 다릅니다.</p><a href="https://www.epeople.go.kr" target="_blank" rel="noopener noreferrer" class="outline-btn full-link">국민신문고 바로가기 ↗</a><p class="tiny">※ 이 서비스는 민원을 자동으로 제출하지 않으며, 생성형 AI API를 사용하지 않습니다.</p></div><div class="panel draft-panel"><div class="draft-header"><div><h3>민원 신고서 초안</h3><span>작성 후 사실관계와 개인정보를 직접 확인하세요.</span></div><button type="button" class="outline-btn" id="copyComplaint">복사하기</button></div><textarea id="complaintDraft" rows="13" aria-label="민원 신고서 초안" placeholder="무료 분석 버튼을 누르면 여기에 민원 초안이 생성됩니다. 직접 작성하거나 수정할 수도 있습니다."></textarea><div class="draft-bottom"><span>✓ 자동 제출 없음 · 초안 수정 가능</span><button id="downloadComplaint" type="button" class="text-button">TXT 저장 ↓</button></div></div></div></section>
-        <footer>© 2026 Air Detective · P-NET 01 <span>환경 데이터 출처: Open-Meteo</span></footer>
-      </main>
-    </div>
+        <section class="complaint-section" id="complaintSection"><div class="section-head"><div><span class="eyebrow">CIVIC ACTION / 03</span><h2>민원 초안과 추천 접수처</h2><p>초안을 확인하면 상황에 맞는 공식 창구 <strong>한 곳만</strong> 추천 표시해 드려요.</p></div></div>
+          <div class="complaint-layout"><div class="paper-card draft-card"><div class="card-top"><span class="step-circle">02</span><div><h3>민원 신청서 초안</h3><p>내용을 자유롭게 수정한 뒤 복사할 수 있어요.</p></div></div><textarea id="draftText" rows="15" placeholder="현장 분석을 완료하면 초안이 자동으로 생성됩니다."></textarea><div class="draft-actions"><button id="copyDraft" type="button" class="small-button">초안 복사</button><button id="downloadDraft" type="button" class="small-button outline">TXT 다운로드</button><button id="recommendChannel" type="button" class="small-button outline">접수처 추천 갱신</button></div><p class="fine-print">※ Air Detective는 민원을 자동 제출하지 않아요. 공식 사이트에서 내용과 사진을 직접 확인해 제출해 주세요.</p></div>
+          <div class="paper-card channel-card"><div class="card-top"><span class="step-circle sage">↗</span><div><h3>어디에 접수할까요?</h3><p>아래 접수처 중 한 곳이 초안에 따라 추천됩니다.</p></div></div><div id="recommendMessage" class="recommend-message">분석 후 민원 초안을 확인하면 추천 접수처를 표시해 드려요.</div><div class="channel-list" id="channelList">
+            <a class="channel" data-channel="safety" href="https://www.safetyreport.go.kr/" target="_blank" rel="noopener noreferrer"><span class="channel-icon">⚑</span><span><b>안전신문고</b><small>공사장·환경 관련 위험 또는 현장 신고</small></span><span class="recommend-badge">추천</span><span class="channel-arrow">↗</span></a>
+            <a class="channel" data-channel="epeople" href="https://www.epeople.go.kr/" target="_blank" rel="noopener noreferrer"><span class="channel-icon">▤</span><span><b>국민신문고</b><small>행정기관에 현장 확인·개선 조치 요청</small></span><span class="recommend-badge">추천</span><span class="channel-arrow">↗</span></a>
+            <a class="channel" data-channel="seoul" href="https://eungdapso.seoul.go.kr/" target="_blank" rel="noopener noreferrer"><span class="channel-icon">⌂</span><span><b>서울시 응답소</b><small>서울 지역 생활불편·환경 민원</small></span><span class="recommend-badge">추천</span><span class="channel-arrow">↗</span></a>
+            <a class="channel" data-channel="call110" href="https://www.110.go.kr/" target="_blank" rel="noopener noreferrer"><span class="channel-icon">☎</span><span><b>국민콜110</b><small>담당 기관·민원 절차 상담 (접수처 안내)</small></span><span class="recommend-badge">추천</span><span class="channel-arrow">↗</span></a>
+            <a class="channel" data-channel="call120" href="https://eungdapso.seoul.go.kr/" target="_blank" rel="noopener noreferrer"><span class="channel-icon">☏</span><span><b>서울 120 다산콜</b><small>서울 지역 전화 민원·상담 안내</small></span><span class="recommend-badge">추천</span><span class="channel-arrow">↗</span></a>
+          </div><p class="fine-print">지역과 사안에 따라 실제 담당 부서·접수 가능 유형이 다를 수 있어요. 추천은 안내용이며 민원 승인·제출을 보장하지 않아요.</p></div></div>
+        </section>
+      </section>
+      <section id="mapView" class="view map-view" aria-labelledby="mapTitle" hidden>
+        <div class="map-intro"><div><span class="eyebrow">AIR DETECTIVE / 02 — EXPLORE</span><h1 id="mapTitle">우리나라 주변 <em>오염 가능 시설</em> 살펴보기</h1><p>지도를 이동하면 화면 안에 등록된 공사장·산업시설·채석장을 자동 조회해요. 마커가 겹치면 숫자로 묶어 표시하고, 누르면 펼쳐집니다. 정확한 시설명과 현재 공사 여부는 원본 등록 정보를 확인해 주세요.</p></div><button class="button subtle" id="mapMyLocation">⌖ 내 위치로 이동</button></div>
+        <div class="map-toolbar"><div class="map-search"><input id="mapSearchQuery" placeholder="전국 시·군·구 또는 주소 검색 (예: 대구 달서구)" aria-label="지도 위치 검색"><button id="mapSearchButton" type="button" class="small-button">이동</button></div><div class="map-filters" aria-label="표시 시설 유형"><label><input type="checkbox" value="construction" checked> <i class="legend-dot construction"></i> 공사 표기 구역</label><label><input type="checkbox" value="industrial" checked> <i class="legend-dot industrial"></i> 공업·산업시설</label><label><input type="checkbox" value="quarry" checked> <i class="legend-dot quarry"></i> 채석장</label></div></div>
+        <div class="map-quick-guide"><div class="map-guide-title">🌿 내 주변 공사장 찾기</div><p>① <b>내 위치 찾기</b>를 누르고 위치 권한을 허용하세요. ② 가장 가까운 <b>공개 지도 등록 공사장</b>이 표시됩니다. ③ 마커나 목록을 누르면 상세 정보를 볼 수 있어요.</p><div class="map-guide-actions"><button id="mapFindNearest" type="button" class="button primary">⌖ 내 위치 · 가장 가까운 공사장 찾기</button><button id="mapShowBoth" type="button" class="small-button outline" disabled>두 지점 함께 보기</button></div></div>
+        <section id="nearestPanel" class="nearest-panel" aria-live="polite"><div class="nearest-panel-icon">📍</div><div class="nearest-panel-content"><strong id="nearestTitle">내 위치에서 가장 가까운 공사장</strong><p id="nearestDescription">버튼을 누르면 위치를 확인하고 주변 공사장 등록 지점을 검색해요.</p><small id="nearestNotice">등록 정보가 없거나 최신 정보가 아닐 수 있으며, 공사 진행 여부는 보장되지 않습니다.</small></div></section>
+        <div class="map-layout"><div class="map-frame"><div id="facilityMap" role="application" aria-label="대한민국 공사·산업 시설 탐색 지도"></div><div class="map-key"><span><i class="position-dot"></i> 내 위치</span><span><i class="legend-dot construction"></i> 공사장 표기</span><span><i class="legend-dot industrial"></i> 산업시설</span></div><div class="map-bottom-note">© OpenStreetMap contributors · 위치는 OSM 등록 정보를 반영하며 현장 상태를 보증하지 않습니다.</div></div><aside class="map-sidebar"><div class="sidebar-top"><span class="eyebrow">VISIBLE PLACES</span><h3>화면 안의 시설</h3><div class="map-count" id="facilityCount">0 <small>개 장소</small></div><p id="mapStatus" role="status" aria-live="polite">지도를 이동하면 화면 안에 등록된 시설을 자동 검색해요. 숫자 묶음을 클릭하면 개별 장소가 나타나요.</p><button id="refreshMap" type="button" class="small-button outline full">지도 데이터 새로고침 ↻</button></div><div id="facilityList" class="facility-list"><p class="empty-list">이동한 지도 범위의 등록 시설을 불러옵니다.</p></div><div class="map-caution">⚠ <strong>중요</strong><br>OpenStreetMap의 공사 표기는 실제로 현재 진행 중인 공사와 다를 수 있습니다. 등록되지 않은 공사장도 많습니다. 이 지도는 오염원 확정이나 실시간 공사 현황 지도가 아닙니다.</div></aside></div>
+      </section>
+    </main>
+    <footer class="footer"><span>✿ Air Detective · P-NET 01</span><span>OpenStreetMap · Open-Meteo · 브라우저 내 무료 이미지 분석</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
 </body>
