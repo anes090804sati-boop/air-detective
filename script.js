@@ -36,51 +36,33 @@ fetchJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lo
 }catch(e){state.weather=null;['pm10','pm25','windSpeed','windDirection'].forEach(id=>$(id).textContent='--');$('rain').textContent='강수 -- mm';$('updatedAt').textContent='날씨 정보 조회 실패';notify('환경 데이터를 가져오지 못했습니다. 인터넷 연결을 확인해 주세요.');}}
 function fmt(v){return typeof v==='number'?v.toFixed(1):'--';}
 function mapFeature(elem){const t=elem.tags||{},p=elem.type==='node'?{lat:elem.lat,lon:elem.lon}:elem.center;if(!p||!Number.isFinite(p.lat)||!Number.isFinite(p.lon)||!inKorea(p))return null;let cat='';if(t.landuse==='construction'||t.building==='construction'||t.highway==='construction'||t.construction)cat='construction';else if(t.landuse==='quarry'||t.industrial==='quarry')cat='quarry';else if(t.landuse==='industrial'||t.industrial)cat='industrial';else return null;const name=t.name||t['name:ko']||((t.description||'').slice(0,55))||`${CLASS_LABEL[cat]} (이름 미등록)`;return {id:`${elem.type}-${elem.id}`,lat:p.lat,lon:p.lon,name,cat,tags:t};}
-// Free public OSM Overpass API. Broad maps use only construction records and capped results;
-// finer zooms can include additional kinds. Never claim a capped set is exhaustive.
-// Facility data flows through our same-origin Vercel function first; this avoids
-// direct-browser cross-origin POST/CORS failures and exposes actionable errors.
-// If a deployment has not yet picked up api/facilities.js, try a read-only direct
-// query as a fallback. No fabricated facility locations are ever added.
-const OVERPASS_FALLBACKS = [
-  'https://overpass.private.coffee/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass-api.de/api/interpreter'
-];
-async function fetchOSM(query) {
-  const proxy='/api/facilities';
-  let proxyError;
-  try {
-    const proxyResponse=await fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query})});
-    const response=await proxyResponse.json().catch(()=>{throw Error('중계 API에서 JSON 대신 다른 응답이 왔습니다. 경로 설정을 확인하세요.')});
-    if(!proxyResponse.ok)throw Error(`${proxyResponse.status}: ${response.error||'알 수 없는 오류'}${response.details?' / '+response.details.join(' · '):''}`);
-    if(!Array.isArray(response.elements))throw Error('중계 API 응답에 시설 목록이 없습니다.');
-    state.mapDataSource='Vercel 시설 조회 중계 서버';
-    state.mapLastFetchInfo=`${response.elements.length}개 OSM 원본 객체 수신 · ${response.source||'Overpass'}`;
-    return response;
-  }catch(e){proxyError=e;}
-  let errors=[];
-  for(const endpoint of OVERPASS_FALLBACKS){
-    try{
-      const result=await fetchJSON(endpoint+'?data='+encodeURIComponent(query),11000);
-      if(!Array.isArray(result.elements))throw Error('시설 목록 누락');
-      state.mapDataSource='브라우저 직접 조회';
-      state.mapLastFetchInfo=`${result.elements.length}개 OSM 원본 객체 수신 · ${new URL(endpoint).hostname}`;
-      return result;
-    }catch(e){errors.push(`${new URL(endpoint).hostname}: ${e.message}`);}
+// Facility data is generated from the official Geofabrik South Korea OSM extract
+// by a GitHub Action and committed as one static file. No Overpass requests in browsers.
+// Records may be stale or incomplete; they do NOT prove active construction or air pollution.
+let facilityDatasetPromise = null;
+async function loadFacilityDataset(force=false){
+  if(force)facilityDatasetPromise=null;
+  if(!facilityDatasetPromise){
+    facilityDatasetPromise=(async()=>{
+      const response=await fetch('/data/facilities.json'+(force?'?v='+Date.now():''),{cache:force?'reload':'default'});
+      if(!response.ok)throw Error(`저장된 시설 자료를 가져오지 못했어요 (HTTP ${response.status}).`);
+      const data=await response.json();
+      if(data.status!=='ready'||!Array.isArray(data.features))throw Error('전국 시설 데이터가 아직 생성되지 않았어요. GitHub Actions의 「Build facility snapshot」을 한 번 실행해야 합니다.');
+      const features=data.features.filter(f=>f&&Number.isFinite(f.lat)&&Number.isFinite(f.lon)&&inKorea(f)&&CLASS_LABEL[f.cat]);
+      state.facilityData=features;
+      state.mapDataSource='GitHub에 저장된 국내 OSM 시설 스냅샷';
+      state.mapLastFetchInfo=`원본 ${features.length.toLocaleString('ko-KR')}개 · ${data.generated_at||'생성일 미확인'}`;
+      return features;
+    })().catch(err=>{facilityDatasetPromise=null;throw err;});
   }
-  throw Error(`시설 데이터 연결 실패. Vercel 중계 API: ${proxyError?.message||'불명'} / 직접 조회: ${errors.join(' · ')}`);
+  return facilityDatasetPromise;
 }
-function osmedFeatures(result){return [...new Map((result.elements||[]).map(mapFeature).filter(Boolean).map(f=>[f.id,f])).values()];}
-async function overpass(bounds,limit=140,onlyConstruction=false){
- const box=[bounds.getSouth(),bounds.getWest(),bounds.getNorth(),bounds.getEast()].map(v=>Number(v).toFixed(5)).join(',');
- const construction=`nwr["landuse"="construction"](${box});nwr["building"="construction"](${box});nwr["highway"="construction"](${box});`;
- const other=onlyConstruction?'':`nwr["landuse"="industrial"](${box});nwr["landuse"="quarry"](${box});`;
- const result=await fetchOSM(`[out:json][timeout:20];(${construction}${other});out center;`);
- return osmedFeatures(result);
+async function nearbyPlaces(p){
+  const all=await loadFacilityDataset();
+  return all.filter(f=>Math.abs(f.lat-p.lat)<.015&&Math.abs(f.lon-p.lon)<.018)
+    .map(f=>({...f,distance:dist(p,f)})).filter(f=>f.distance<=1300)
+    .sort((a,b)=>a.distance-b.distance).slice(0,7);
 }
-function boundsAround(p,metres){const dl=metres/111320,dx=metres/(111320*Math.cos(p.lat*Math.PI/180));return{getSouth:()=>p.lat-dl,getWest:()=>p.lon-dx,getNorth:()=>p.lat+dl,getEast:()=>p.lon+dx};}
-async function nearbyPlaces(p){const found=await overpass(boundsAround(p,1300),100);return found.map(f=>({...f,distance:dist(p,f)})).filter(f=>f.distance<=1300).sort((a,b)=>a.distance-b.distance).slice(0,7);}
 function getSiteGeopoint(){return state.loc;}
 async function resolveSiteLocation(){const entered=normalize($('siteLocation').value);if(!entered)return state.loc;const same=entered===state.loc.name||entered===state.loc.name.split(',')[0]||entered==='현재 조회 위치';if(same)return state.loc;try{const loc=await geocode(entered);return loc;}catch{return null;}}
 function getPhotoFile(){return $('photoInput').files?.[0]||null;}
@@ -262,7 +244,7 @@ async function findNearestConstruction(){
     if(id!==state.nearestSearchId)return;
     state.userGeo={lat:pos.lat,lon:pos.lon};drawUserMarker();
     state.map.setView([pos.lat,pos.lon],15);
-    showNearestPanel('주변 공사장 정보를 조회하고 있어요…','먼저 반경 1.5km를 검색하고, 결과가 없으면 4km와 8km로 넓혀요.','무료 공개 데이터 서버가 혼잡하면 조회가 실패할 수 있습니다.');
+    showNearestPanel('주변 공사장 정보를 조회하고 있어요…','먼저 반경 1.5km를 검색하고, 결과가 없으면 4km와 8km로 넓혀요.','GitHub에 생성된 시설 자료에서 검색합니다. 실제 공사 중인지 확인한 것은 아닙니다.');
     let found=[];let usedRadius=0;
     for(const radius of [1500,4000,8000]){
       if(id!==state.nearestSearchId)return;
@@ -281,9 +263,9 @@ async function findNearestConstruction(){
   finally{if(id===state.nearestSearchId){btn.disabled=false;btn.textContent='⌖ 내 위치 · 가장 가까운 공사장 찾기';}}
 }
 async function overpassConstruction(pos,radius){
- const center=`around:${radius},${pos.lat.toFixed(6)},${pos.lon.toFixed(6)}`;
- const query=`[out:json][timeout:20];(nwr["landuse"="construction"](${center});nwr["building"="construction"](${center});nwr["highway"="construction"](${center}););out center;`;
- return osmedFeatures(await fetchOSM(query));
+ const all=await loadFacilityDataset();
+ const latLimit=radius/111320,lonLimit=radius/(111320*Math.cos(pos.lat*Math.PI/180));
+ return all.filter(f=>f.cat==='construction'&&Math.abs(f.lat-pos.lat)<=latLimit&&Math.abs(f.lon-pos.lon)<=lonLimit);
 }
 function repairMapSize(){
   if(!state.map || $('mapView').hidden)return;
@@ -415,56 +397,27 @@ function redrawMap(){
   }
   group.addLayers?group.addLayers(markers):markers.forEach(marker=>group.addLayer(marker));
 }
-// Overpass's public endpoints are shared; keep wide-area requests bounded.
-// Above zoom 10, retrieve the entire result set for the selected categories
-// within the displayed area, not an arbitrary first-220 subset.
-async function overpassViewport(bounds, categories){
- const box=[bounds.getSouth(),bounds.getWest(),bounds.getNorth(),bounds.getEast()].map(v=>Number(v).toFixed(5)).join(',');
- const fragments=[];
- if(categories.has('construction'))fragments.push(`nwr["landuse"="construction"](${box});nwr["building"="construction"](${box});nwr["highway"="construction"](${box});`);
- if(categories.has('industrial'))fragments.push(`nwr["landuse"="industrial"](${box});`);
- if(categories.has('quarry'))fragments.push(`nwr["landuse"="quarry"](${box});`);
- if(!fragments.length)return [];
- return osmedFeatures(await fetchOSM(`[out:json][timeout:20];(${fragments.join('')});out center;`));
-}
+// The static nationwide snapshot is loaded once and filtered locally on map movement.
+// No Overpass API rate limits or server-side proxy are involved in viewing facilities.
 async function loadMap(force=false){
-  const m=state.map;if(!m||$('mapView').hidden)return;
-  const b=m.getBounds(),zoom=m.getZoom();
-  // Zoomed-out nationwide data would be too heavy for a free live endpoint;
-  // zoom into the city to request the COMPLETE visible OSM result set.
-  if(zoom<10){
-    state.mapRequest=Symbol();state.mapFeatures=[];state.mapLastKey='';redrawMap();
-    $('mapStatus').textContent='전국 화면에서는 전체 공사장 자료를 한 번에 받아올 수 없어요. 관심 지역을 10단계 이상 확대하면 화면 안의 등록 시설을 개수 제한 없이 자동 조회합니다.';
-    return;
-  }
-  const enabled=new Set([...document.querySelectorAll('.map-filters input:checked')].map(el=>el.value));
-  const region=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(n=>n.toFixed(4)).join(',');
-  const key=region+';'+[...enabled].sort().join(',');
-  if(!force && key===state.mapLastKey)return;
-  state.mapLastKey=key;
-  const token=Symbol();state.mapRequest=token;
-  if(!enabled.size){state.mapFeatures=[];redrawMap();$('mapStatus').textContent='공사장·산업시설·채석장 중 한 가지 이상 선택해 주세요.';return;}
-  const cache=state.mapViewportCache;
-  if(!force && cache.has(key)){
-    state.mapFeatures=cache.get(key);redrawMap();
-    $('mapStatus').textContent=`이 화면의 공개 지도 등록 시설 ${state.mapFeatures.length.toLocaleString('ko-KR')}개 · 저장된 최근 조회 결과입니다.`;
-    return;
-  }
-  $('mapStatus').textContent='⏳ 화면의 시설 정보를 조회 중입니다. 조회 성공 여부와 원본 객체 수를 곧 표시합니다.';
-  try{
-    const features=await overpassViewport(b,enabled);
-    if(state.mapRequest!==token)return;
-    state.mapFeatures=features;
-    cache.set(key,features);if(cache.size>10)cache.delete(cache.keys().next().value);
-    redrawMap();
-    const count=state.mapFeatures.filter(f=>b.contains([f.lat,f.lon])).length;
-    $('mapStatus').textContent=count?`✅ 조회 성공: 화면 안 ${count.toLocaleString('ko-KR')}개 표시 · ${state.mapLastFetchInfo} · ${state.mapDataSource}`:`⚠️ 조회 성공했지만 화면 내 표시 가능한 등록 시설 0개입니다. ${state.mapLastFetchInfo}. 이 지역의 OSM 등록 누락일 수 있습니다.`;
-  }catch(error){
-    if(state.mapRequest!==token)return;
-    state.mapLastKey='';
-    // Keep previously displayed markers instead of wiping the map on temporary outage.
-    $('mapStatus').textContent=`❌ 시설 데이터 조회 실패(빈 결과 아님): ${error.message}. Vercel 배포에 api/facilities.js와 새 vercel.json이 포함됐는지 확인하세요.`;
-  }
+ const m=state.map;if(!m||$('mapView').hidden)return;
+ const token=Symbol();state.mapRequest=token;
+ const enabled=new Set([...document.querySelectorAll('.map-filters input:checked')].map(x=>x.value));
+ if(!enabled.size){state.mapFeatures=[];redrawMap();$('mapStatus').textContent='표시할 시설 유형을 하나 이상 선택해 주세요.';return;}
+ $('mapStatus').textContent='⌛ 저장된 전국 시설 정보를 읽고 있어요…';
+ try{
+   const all=await loadFacilityDataset(force);
+   if(state.mapRequest!==token)return;
+   const bounds=m.getBounds();
+   state.mapFeatures=all.filter(f=>enabled.has(f.cat)&&bounds.contains([f.lat,f.lon]));
+   redrawMap();
+   const count=state.mapFeatures.length;
+   $('mapStatus').textContent=`✅ 지도에 등록 시설 ${count.toLocaleString('ko-KR')}개 표시 · ${state.mapLastFetchInfo}. 공개 지도 등록 정보이며 실제 공사 진행 상태와 다를 수 있습니다.`;
+ }catch(e){
+   if(state.mapRequest!==token)return;
+   state.mapFeatures=[];redrawMap();
+   $('mapStatus').textContent=`❌ 시설 자료 준비 필요: ${e.message} (실제 시설 0개라는 의미가 아닙니다.)`;
+ }
 }
-function bindEvents(){setupTabs();$('searchLocation').addEventListener('click',async()=>{const q=normalize($('locationQuery').value);if(!q)return notify('지역이나 주소를 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p);notify('지역 정보가 갱신됐어요.');}catch(e){notify(e.message);}});$('locationQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){$('searchLocation').click();}});$('myLocation').addEventListener('click',locate);$('applyLocation').addEventListener('click',()=>{$('siteLocation').value=state.loc.name;notify('현재 조회 위치를 적용했어요.');});$('photoSelect').addEventListener('click',()=>$('photoInput').click());$('photoInput').addEventListener('change',e=>usePhoto(e.target.files[0]));$('removePhoto').addEventListener('click',clearPhoto);$('reportForm').addEventListener('submit',analyze);$('copyDraft').addEventListener('click',async()=>{const val=$('draftText').value;if(!val)return notify('민원 초안을 먼저 작성해 주세요.');try{await navigator.clipboard.writeText(val);notify('민원 초안을 복사했어요.');}catch{notify('복사 권한이 없어요. 내용을 선택해 직접 복사해 주세요.');}});$('downloadDraft').addEventListener('click',()=>{const text=$('draftText').value;if(!text)return notify('민원 초안을 먼저 작성해 주세요.');const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='AirDetective_민원초안.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});$('recommendChannel').addEventListener('click',()=>{if(!state.analysis)return notify('분석 결과를 먼저 만들어 주세요.');recommend(state.analysis);notify('추천 접수처를 표시했어요.');});$('mapMyLocation').addEventListener('click',async()=>{const p=await locate();if(p){showNearestPanel('내 위치 확인 완료','가장 가까운 등록 공사장을 찾으려면 아래 검색 버튼을 눌러 주세요.');}});$('mapFindNearest').addEventListener('click',findNearestConstruction);$('mapShowBoth').addEventListener('click',showBothLocations);$('mapSearchButton').addEventListener('click',async()=>{const q=normalize($('mapSearchQuery').value);if(!q)return notify('지역을 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p,true);}catch(e){notify(e.message);}});$('mapSearchQuery').addEventListener('keydown',e=>{if(e.key==='Enter')$('mapSearchButton').click();});$('refreshMap').addEventListener('click',()=>{repairMapSize();state.mapLastKey='';loadMap(true);});document.querySelectorAll('.map-filters input').forEach(i=>i.addEventListener('change',()=>{state.mapLastKey='';loadMap(true);}));}
+function bindEvents(){setupTabs();$('searchLocation').addEventListener('click',async()=>{const q=normalize($('locationQuery').value);if(!q)return notify('지역이나 주소를 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p);notify('지역 정보가 갱신됐어요.');}catch(e){notify(e.message);}});$('locationQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){$('searchLocation').click();}});$('myLocation').addEventListener('click',locate);$('applyLocation').addEventListener('click',()=>{$('siteLocation').value=state.loc.name;notify('현재 조회 위치를 적용했어요.');});$('photoSelect').addEventListener('click',()=>$('photoInput').click());$('photoInput').addEventListener('change',e=>usePhoto(e.target.files[0]));$('removePhoto').addEventListener('click',clearPhoto);$('reportForm').addEventListener('submit',analyze);$('copyDraft').addEventListener('click',async()=>{const val=$('draftText').value;if(!val)return notify('민원 초안을 먼저 작성해 주세요.');try{await navigator.clipboard.writeText(val);notify('민원 초안을 복사했어요.');}catch{notify('복사 권한이 없어요. 내용을 선택해 직접 복사해 주세요.');}});$('downloadDraft').addEventListener('click',()=>{const text=$('draftText').value;if(!text)return notify('민원 초안을 먼저 작성해 주세요.');const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='AirDetective_민원초안.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});$('recommendChannel').addEventListener('click',()=>{if(!state.analysis)return notify('분석 결과를 먼저 만들어 주세요.');recommend(state.analysis);notify('추천 접수처를 표시했어요.');});$('mapMyLocation').addEventListener('click',async()=>{const p=await locate();if(p){showNearestPanel('내 위치 확인 완료','가장 가까운 등록 공사장을 찾으려면 아래 검색 버튼을 눌러 주세요.');}});$('mapFindNearest').addEventListener('click',findNearestConstruction);$('mapShowBoth').addEventListener('click',showBothLocations);$('mapSearchButton').addEventListener('click',async()=>{const q=normalize($('mapSearchQuery').value);if(!q)return notify('지역을 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p,true);}catch(e){notify(e.message);}});$('mapSearchQuery').addEventListener('keydown',e=>{if(e.key==='Enter')$('mapSearchButton').click();});$('refreshMap').addEventListener('click',()=>{repairMapSize();loadMap(true);});document.querySelectorAll('.map-filters input').forEach(i=>i.addEventListener('change',()=>{state.mapLastKey='';loadMap(true);}));}
 window.addEventListener('DOMContentLoaded',()=>{bindEvents();fetchWeather();});

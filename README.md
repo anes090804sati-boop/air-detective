@@ -1,35 +1,26 @@
-# Air Detective V4.7 — 시설 마커 조회 실패 진단 + Vercel 중계 API
+# Air Detective V4.8 — 공용 Overpass 서버 없이 작동하는 시설 지도
 
-## 발견한 문제
-- 기존 지도 이미지는 OSM 타일로 정상 표시되지만, 실제 **시설 위치 마커는 별도 Overpass 요청**에 달려 있습니다.
-- V4.6은 브라우저에서 외부 Overpass 서버에 CORS가 필요한 POST를 직접 보냈고, 혼잡하거나 접근이 안 되는 호스트를 우선 사용했습니다.
-- 따라서 지도에는 내 위치만 보이면서도 사용자가 데이터 조회 실패 원인을 알기 어려웠습니다.
+이 버전은 **매번 Overpass를 호출하지 않습니다.** 429 오류를 피하기 위해 GitHub Actions가 공개 OSM 대한민국 추출본(Geofabrik)을 처리하여 `data/facilities.json` 파일로 저장하는 구조입니다.
 
-## 변경 사항
-- `api/facilities.js` **신규 필수 파일**: Vercel 서버 측에서 Overpass API로 시설 데이터를 요청합니다. 무료이고 API 키가 필요하지 않습니다.
-- `vercel.json` **필수 교체**: `/api/facilities`를 위 Vercel 서버 함수에 연결합니다.
-- `script.js`: 중계 API 먼저 사용하고 실패 시 다른 공개 Overpass 서버 직접 요청을 보조적으로 시도합니다.
-- 지도 상태에 **성공 / 조회된 OSM 원본 객체 수 / 실제 표시 수 / 실패 원인**을 명확하게 보입니다.
-- 지도 스타일, 분석 결과, 사진 인식, 민원 초안은 기존 V4.6을 유지합니다.
+## 처음 딱 한 번 설정
 
-## 반드시 올려야 하는 파일
-GitHub 저장소 최상위에 다음의 **전체 경로**를 올려주세요.
-```
-index.html
-style.css
-script.js
-vercel.json
-api/facilities.js   <-- 새 파일, 반드시 업로드
-```
-GitHub의 Add file → Upload files에서 `api` **폴더까지 업로드**하여 `api/facilities.js`가 생기는지 꼭 확인합니다.
-배포 후 Vercel Deployments의 최신 배포가 Ready인지 확인합니다.
+1. ZIP을 풀어 **`.github/workflows/build-facilities.yml` 및 `scripts/` 폴더를 포함한 모든 파일**을 GitHub 저장소의 동일한 경로에 업로드합니다.
+2. **Commit changes**를 누르면 GitHub Actions에서 `Build facility snapshot` 작업이 자동으로 시작됩니다. 시작되지 않으면 GitHub 저장소의 **Actions → Build facility snapshot → Run workflow**를 누르세요.
+3. 작업의 `Commit snapshot into repository` 단계에서 권한 오류가 뜨면 **Settings → Actions → General → Workflow permissions**에서 `Read and write permissions`를 허용한 다음 작업을 다시 실행하세요. 조직 정책에 따라 선택할 수 없을 수도 있습니다.
+4. 실행이 성공하면 `data/facilities.json`에 실제 등록 시설이 채워지고, 자동 커밋 후 Vercel이 재배포합니다.
+5. `https://air-detective.vercel.app/data/facilities.json`에서 `status: ready`와 `features`를 확인합니다. `not_generated`이면 아직 자료 생성이 완료되지 않은 것입니다.
 
-## 진단 절차
-1. 사이트를 강력 새로고침(Ctrl+Shift+R)한 뒤 지도 탭을 열어 **확대 수준 10 이상**으로 확대하세요.
-2. 오른쪽 `지도 상태`에 `✅ 조회 성공`과 `화면 안 N개 표시`, `OSM 원본 객체 수`가 출력되면 데이터가 도착한 것입니다.
-3. `⚠ 조회 성공 ... 0개`라면 서버 연결은 됐지만 현재 화면에 표시할 OSM 등록 시설이 없다는 뜻입니다. 주변 다른 지역에서 시험해 보세요.
-4. `❌ 시설 데이터 조회 실패`라면 서버 연결 오류입니다. Vercel → Logs와 업로드된 `api/facilities.js`, `vercel.json`을 확인하세요.
-5. `/api/facilities`를 브라우저에서 직접 열면 `POST만 허용합니다.`는 표시가 나오는 것이 정상입니다 (API가 배포된 것).
+## 작동 방식
 
-## 정직한 제약
-공사 관련 시설은 OSM 사용자 등록 데이터이며 **전국 실제 모든 공사장**이 아닙니다. 미등록, 폐공사, 현장 변경이 있을 수 있습니다. 무료 Overpass 서버가 모두 과부하되면 데이터가 0개가 아니라 **서버 오류**로 표시됩니다. 이 환경에서는 실제 사용자 브라우저와 Vercel에 대한 네트워크 연결이 불가능해 외부 서버 응답을 종단간 검증하지 못했습니다.
+- OpenStreetMap의 대한민국 공개 추출 데이터를 읽어 `landuse=construction`, `building=construction`, `highway=construction`, `landuse=industrial`, `landuse=quarry` 객체들의 위치를 뽑습니다.
+- 지도 이동과 확대·축소는 **저장된 JSON에서 브라우저 내 필터링**하므로 외부 Overpass 429가 발생하지 않습니다.
+- 최초 데이터 생성은 GitHub Actions에서 한 번 실행해야 하고, 주 1회 갱신을 시도합니다. 서버/API 키 결제 필요 없습니다.
+- GitHub Actions 실행이나 다운로드 실패 시 이전 스냅샷이 유지됩니다. 최초 실행이 실패했다면 지도에 **자료 생성 필요** 메시지가 나타납니다. 성공하기 전에 마커가 보인다고 주장하지 않습니다.
+
+## 중요한 한계
+
+OSM에 지도 등록되지 않은 공사장은 나오지 않습니다. 현재 공사 중인지도 검증되지 않으며, 산업시설이 실제로 대기를 오염시키고 있다는 뜻이 아닙니다. 전체 공사장과 동일하지 않습니다. © OpenStreetMap contributors · ODbL.
+
+## 업로드 관련
+
+예전의 `api/facilities.js` 및 `server.js`, `package.json`은 V4.8 지도에 사용하지 않습니다. GitHub에서 지워도 됩니다. **새 `vercel.json`을 반드시 적용하세요.**
