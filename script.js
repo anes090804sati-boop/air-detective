@@ -30,7 +30,7 @@ function normalize(s){return String(s||'').trim().replace(/\s+/g,' ');}
 function delay(ms){return new Promise(r=>setTimeout(r,ms));}
 function setBusy(status){$('formStatus').textContent=status||'';}
 async function fetchJSON(url,limit=13000,options={}){const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),limit);try{const response=await fetch(url,{...options,signal:controller.signal});if(!response.ok)throw Error(`서버 응답 ${response.status}`);return await response.json();}finally{clearTimeout(timeout);}}
-async function geocode(query){const url=`https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=kr&q=${encodeURIComponent(query)}`;const rows=await fetchJSON(url);const row=rows?.[0];if(!row)throw Error('국내 검색 결과를 찾지 못했습니다.');return {lat:+row.lat,lon:+row.lon,name:row.display_name.split(',').slice(0,3).join(',')};}
+async function geocode(query){const url=`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&accept-language=ko&limit=3&countrycodes=kr&q=${encodeURIComponent(query)}`;const rows=await fetchJSON(url);const row=rows?.[0];if(!row)throw Error('국내 검색 결과를 찾지 못했습니다.');return {lat:+row.lat,lon:+row.lon,name:row.display_name.split(',').slice(0,3).join(','),address:row.address||{}};}
 async function reverseGeocode(p){try{const u=`https://nominatim.openstreetmap.org/reverse?format=json&lat=${p.lat}&lon=${p.lon}&zoom=16`;const r=await fetchJSON(u,8500);return r.display_name?.split(',').slice(0,3).join(',')||'현재 위치';}catch{return '현재 위치';}}
 async function changeLocation(loc,moveMap=false){if(!inKorea(loc)){notify('대한민국 내 위치만 지원합니다.');return;}state.loc=loc;$('locationName').textContent=`⌖ ${loc.name}`;$('coordinateHint').textContent=`분석 기준 좌표: ${loc.lat.toFixed(5)}, ${loc.lon.toFixed(5)}`;await fetchWeather();if(moveMap&&state.map){state.map.setView([loc.lat,loc.lon],14);}}
 async function fetchWeather(){const {lat,lon}=state.loc;try{const [aq,met]=await Promise.all([
@@ -113,7 +113,82 @@ ${hasPhoto?'현장 사진을 보유하고 있으며 접수 시 별도로 첨부�
 
 ※ 접수 전 장소·일시·피해 내용을 확인하고 필요에 따라 수정해 주세요. 본 문서는 자동 작성된 초안이며 민원을 자동 제출하지 않습니다.`;
 }
-function recommend(r){let best='epeople',reason='현장 확인과 개선 조치를 공식적으로 요청하는 일반 민원에 적합해요.';const seoul=/서울|강남|강북|강동|강서|관악|광진|구로|금천|노원|도봉|동대문|동작|마포|서대문|서초|성동|성북|송파|양천|영등포|용산|은평|종로|중구|중랑/.test(r.place)||r.p&&(r.p.lat>37.40&&r.p.lat<37.72&&r.p.lon>126.76&&r.p.lon<127.23);if(seoul){best='seoul';reason='제보 위치가 서울권으로 확인되어 서울시의 공식 생활불편 접수 창구를 우선 추천해요.';}else if(['construction','demolition','road','vehicle'].includes(r.type)){best='safety';reason='공사·도로 등 현장 위험 또는 환경 관련 신고에 적합할 수 있어 안전신문고를 우선 추천해요.';}document.querySelectorAll('.channel').forEach(x=>x.classList.toggle('recommended',x.dataset.channel===best));$('recommendMessage').textContent=`✦ 추천: ${$('channelList').querySelector(`[data-channel="${best}"] b`).textContent} — ${reason}`;$('recommendMessage').classList.add('active');}
+// V4.10: third complaint card follows the *reported incident site*, not the user's current position.
+// Other provinces do not all operate a portal called '응답소'; link to the relevant official
+// provincial/metro government site and clearly label direct submission vs information page.
+const LOCAL_CHANNELS=[
+ {id:'seoul',label:'서울시 응답소',region:'서울특별시',keys:['서울특별시','서울시','서울'],url:'https://eungdapso.seoul.go.kr/',direct:true,description:'서울 지역 생활불편·환경 민원 바로가기'},
+ {id:'busan',label:'부산민원120',region:'부산광역시',keys:['부산광역시','부산시','부산'],url:'https://www.busan.go.kr/minwon/minwon02',direct:true,description:'부산광역시 공식 통합민원신청'},
+ {id:'daegu',label:'대구시 민원 안내',region:'대구광역시',keys:['대구광역시','대구시','대구'],url:'https://www.daegu.go.kr/',description:'대구시 공식 홈페이지 · 두드리소 등 민원 메뉴 확인'},
+ {id:'incheon',label:'인천시 민원 안내',region:'인천광역시',keys:['인천광역시','인천시','인천'],url:'https://www.incheon.go.kr/',description:'인천시 공식 홈페이지 · 민원신청 메뉴 확인'},
+ {id:'gwangju',label:'광주시 민원 안내',region:'광주광역시',keys:['광주광역시','광주광역'],url:'https://www.gwangju.go.kr/',description:'광주광역시 공식 홈페이지 · 민원접수 메뉴 확인'},
+ {id:'daejeon',label:'대전시 민원신청',region:'대전광역시',keys:['대전광역시','대전시','대전'],url:'https://www.daejeon.go.kr/drh/DrhContentsHtmlView.do?menuSeq=1464',direct:true,description:'대전광역시 공식 민원신청·조회 안내'},
+ {id:'ulsan',label:'울산시 민원 안내',region:'울산광역시',keys:['울산광역시','울산시','울산'],url:'https://www.ulsan.go.kr/',description:'울산시 공식 홈페이지 · 울산시에 바란다 메뉴 확인'},
+ {id:'sejong',label:'세종시 민원 안내',region:'세종특별자치시',keys:['세종특별자치시','세종시','세종'],url:'https://www.sejong.go.kr/',description:'세종시 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'gyeonggi',label:'경기도 민원 안내',region:'경기도',keys:['경기도','경기'],url:'https://www.gg.go.kr/',description:'경기도 공식 홈페이지 · 관할 시·군 민원 담당기관 확인'},
+ {id:'gangwon',label:'강원특별자치도 민원 안내',region:'강원특별자치도',keys:['강원특별자치도','강원도','강원'],url:'https://state.gwd.go.kr/',description:'강원특별자치도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'chungbuk',label:'충청북도 민원 안내',region:'충청북도',keys:['충청북도','충북'],url:'https://www.chungbuk.go.kr/',description:'충청북도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'chungnam',label:'충청남도 민원 안내',region:'충청남도',keys:['충청남도','충남'],url:'https://www.chungnam.go.kr/',description:'충청남도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'jeonbuk',label:'전북특별자치도 민원 안내',region:'전북특별자치도',keys:['전북특별자치도','전라북도','전북'],url:'https://www.jeonbuk.go.kr/',description:'전북특별자치도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'jeonnam',label:'전라남도 민원 안내',region:'전라남도',keys:['전라남도','전남'],url:'https://www.jeonnam.go.kr/',description:'전라남도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'gyeongbuk',label:'경상북도 민원 안내',region:'경상북도',keys:['경상북도','경북'],url:'https://www.gb.go.kr/',description:'경상북도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'gyeongnam',label:'경상남도 민원 안내',region:'경상남도',keys:['경상남도','경남'],url:'https://www.gyeongnam.go.kr/',description:'경상남도 공식 홈페이지 · 민원 메뉴 확인'},
+ {id:'jeju',label:'제주특별자치도 민원 안내',region:'제주특별자치도',keys:['제주특별자치도','제주도','제주'],url:'https://www.jeju.go.kr/',description:'제주특별자치도 공식 홈페이지 · 민원 메뉴 확인'}
+];
+function regionFromText(text){
+ const value=String(text||'').trim();if(!value)return null;
+ const hits=LOCAL_CHANNELS.flatMap(region=>region.keys.filter(key=>value.includes(key)).map(key=>({region,key})));
+ if(!hits.length)return null;
+ // A full province name beats a shorter, ambiguous city fragment (e.g. '경기도 광주시').
+ hits.sort((a,b)=>b.key.length-a.key.length);
+ return hits[0].region;
+}
+function regionForReport(r){
+ // Explicitly entered province wins, then structured geocoding result, then fallback display name.
+ const explicit=regionFromText(r.place);
+ if(explicit)return explicit;
+ const address=r.p?.address||{};
+ const admin=[address.state,address.province,address.region,address.city,address.municipality,address.state_district].filter(Boolean);
+ for(const part of admin){const matched=regionFromText(part);if(matched)return matched;}
+ return regionFromText(r.p?.name);
+}
+function updateLocalComplaintChannel(r){
+ const card=document.querySelector('[data-channel="seoul"]');
+ if(!card)return null;
+ const title=card.querySelector('b'),description=card.querySelector('small');
+ const region=r&&regionForReport(r);
+ if(!region){
+   title.textContent=r?'관할 지자체 확인 필요':'서울시 응답소';
+   description.textContent=r?'피해 장소의 시·도를 확인할 수 없어요. 국민신문고에서 관할 기관을 선택하세요.':'서울 지역 생활불편·환경 민원';
+   card.href=r?'https://www.epeople.go.kr/':'https://eungdapso.seoul.go.kr/';
+   card.dataset.region='unknown';
+   return null;
+ }
+ title.textContent=region.label;
+ description.textContent=region.description;
+ card.href=region.url;
+ card.dataset.region=region.id;
+ return region;
+}
+function recommend(r){
+ const region=updateLocalComplaintChannel(r);
+ let best='epeople',reason='현장 확인과 개선 조치를 공식적으로 요청하는 일반 민원에 적합해요.';
+ if(region?.id==='seoul'){
+   best='seoul';reason='피해 장소가 서울특별시로 확인되어 서울시 응답소를 안내해요.';
+ }else if(region?.direct){
+   best='seoul';reason=`피해 장소가 ${region.region}(으)로 확인되어 해당 지역의 공식 민원 창구를 안내해요.`;
+ }else if(['construction','demolition','road','vehicle'].includes(r.type)){
+   best='safety';reason='공사·도로 관련 현장 위험 또는 환경 신고는 안전신문고가 적합할 수 있어요.';
+ }else if(region){
+   best='epeople';reason=`${region.region} 지역은 세 번째 카드의 지자체 안내도 확인할 수 있어요. 공식 접수는 국민신문고에서 관할 기관을 선택할 수 있습니다.`;
+ }else{
+   reason='피해 장소를 구체적으로 입력하지 않아 관할 지자체를 확정할 수 없습니다. 국민신문고에서 관할 기관을 직접 선택해 주세요.';
+ }
+ document.querySelectorAll('.channel').forEach(x=>x.classList.toggle('recommended',x.dataset.channel===best));
+ const name=document.querySelector(`[data-channel="${best}"] b`)?.textContent||'국민신문고';
+ $('recommendMessage').textContent=`✦ 추천: ${name} — ${reason}`;
+ $('recommendMessage').classList.add('active');
+}
 let analysisInProgress = false;
 function setAnalysisStage(number, message){
   const msg=$('analysisLoadingText');
@@ -135,6 +210,7 @@ function showAnalysisLoading(){
   $('recommendMessage').classList.remove('active');
   $('recommendMessage').textContent='새 분석이 완료되면 적합한 접수처 한 곳을 추천해 드려요.';
   document.querySelectorAll('.channel').forEach(el=>el.classList.remove('recommended'));
+  updateLocalComplaintChannel(null);
   $('analyzeButton').disabled=true;
   $('analyzeButton').textContent='✳ 분석 진행 중…';
   $('reportForm').setAttribute('aria-busy','true');
