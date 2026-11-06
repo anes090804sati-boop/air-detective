@@ -16,6 +16,10 @@ const PHOTO_LABELS = [
   ['a pile of sand or gravel on the ground','모래·자갈 적치 장면']
 ];
 const state = {loc:{lat:37.5665,lon:126.9780,name:'서울특별시청 근처 (초기 위치)'},weather:null,photoURL:null,photo:null,photoResult:null,nearby:[],analysis:null,map:null,mapLayers:[],mapFeatures:[],mapFeatureGroup:null,mapViewportCache:new Map(),mapLastKey:'',mapRequest:null,mapDataSource:'',mapLastFetchInfo:'',userGeo:null,userMarker:null,nearestMarker:null,nearestLine:null,nearestFound:null,nearestSearchId:0};
+// Route search reuses the previously generated GitHub OSM facility snapshot.
+// It does not perform actual road navigation or retrieve real-time works schedules.
+state.route={mode:'browse',start:null,end:null,pick:null,results:null,lineLength:0,radius:200,layer:null,markersGroup:null};
+let routeSearchInProgress=false;
 let toastHandle, mapMoveHandle, classifierPromise;
 function notify(message){const t=$('toast');t.textContent=message;t.classList.add('show');clearTimeout(toastHandle);toastHandle=setTimeout(()=>t.classList.remove('show'),4200);}
 function kmLabel(m){return m<1000?`약 ${Math.round(m/10)*10}m`:`약 ${(m/1000).toFixed(1)}km`;}
@@ -312,6 +316,7 @@ function initMap(){
   }
   window.addEventListener('resize',repairMapSize);
   m.on('moveend',()=>{clearTimeout(mapMoveHandle);mapMoveHandle=setTimeout(()=>loadMap(false),520);});
+  m.on('click',handleRouteMapClick);
   requestAnimationFrame(()=>requestAnimationFrame(repairMapSize));
   drawUserMarker();
   loadMap(false);
@@ -339,7 +344,7 @@ function featureInfo(f){
 // Register all facility points returned by the public data server in the CURRENT viewport.
 // Leaflet.markercluster displays dense places as clickable counts; no artificial 130/220 cap.
 function redrawMap(){
-  const m=state.map;if(!m)return;
+  const m=state.map;if(!m||state.route.mode==='route')return;
   if(state.mapFeatureGroup){m.removeLayer(state.mapFeatureGroup);state.mapFeatureGroup=null;}
   for(const layer of state.mapLayers)m.removeLayer(layer);
   state.mapLayers=[];
@@ -371,7 +376,7 @@ function redrawMap(){
   const markers=[];
   for(const f of visible){
     const marker=L.marker([f.lat,f.lon],{
-      icon:L.divIcon({className:'',html:`<span class="facility-marker ${f.cat}" aria-hidden="true"></span>`,iconSize:[22,22],iconAnchor:[11,11]})
+      icon:L.divIcon({className:'air-facility-icon',html:`<span class="air-facility-pin ${f.cat}" aria-hidden="true">${f.cat==='construction'?'🏗':f.cat==='industrial'?'🏭':'⛏'}</span>`,iconSize:[38,44],iconAnchor:[19,39],popupAnchor:[0,-31]})
     });
     marker.bindPopup(featureInfo(f),{maxWidth:330,minWidth:220});
     marker.bindTooltip(f.name,{direction:'top',offset:[0,-8],opacity:.98});
@@ -400,24 +405,267 @@ function redrawMap(){
 // The static nationwide snapshot is loaded once and filtered locally on map movement.
 // No Overpass API rate limits or server-side proxy are involved in viewing facilities.
 async function loadMap(force=false){
- const m=state.map;if(!m||$('mapView').hidden)return;
+ const m=state.map;if(!m||$('mapView').hidden||state.route.mode==='route')return;
  const token=Symbol();state.mapRequest=token;
  const enabled=new Set([...document.querySelectorAll('.map-filters input:checked')].map(x=>x.value));
  if(!enabled.size){state.mapFeatures=[];redrawMap();$('mapStatus').textContent='표시할 시설 유형을 하나 이상 선택해 주세요.';return;}
  $('mapStatus').textContent='⌛ 저장된 전국 시설 정보를 읽고 있어요…';
  try{
    const all=await loadFacilityDataset(force);
-   if(state.mapRequest!==token)return;
+   if(state.mapRequest!==token||state.route.mode==='route')return;
    const bounds=m.getBounds();
    state.mapFeatures=all.filter(f=>enabled.has(f.cat)&&bounds.contains([f.lat,f.lon]));
    redrawMap();
    const count=state.mapFeatures.length;
    $('mapStatus').textContent=`✅ 지도에 등록 시설 ${count.toLocaleString('ko-KR')}개 표시 · ${state.mapLastFetchInfo}. 공개 지도 등록 정보이며 실제 공사 진행 상태와 다를 수 있습니다.`;
  }catch(e){
-   if(state.mapRequest!==token)return;
+   if(state.mapRequest!==token||state.route.mode==='route')return;
    state.mapFeatures=[];redrawMap();
    $('mapStatus').textContent=`❌ 시설 자료 준비 필요: ${e.message} (실제 시설 0개라는 의미가 아닙니다.)`;
  }
 }
-function bindEvents(){setupTabs();$('searchLocation').addEventListener('click',async()=>{const q=normalize($('locationQuery').value);if(!q)return notify('지역이나 주소를 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p);notify('지역 정보가 갱신됐어요.');}catch(e){notify(e.message);}});$('locationQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){$('searchLocation').click();}});$('myLocation').addEventListener('click',locate);$('applyLocation').addEventListener('click',()=>{$('siteLocation').value=state.loc.name;notify('현재 조회 위치를 적용했어요.');});$('photoSelect').addEventListener('click',()=>$('photoInput').click());$('photoInput').addEventListener('change',e=>usePhoto(e.target.files[0]));$('removePhoto').addEventListener('click',clearPhoto);$('reportForm').addEventListener('submit',analyze);$('copyDraft').addEventListener('click',async()=>{const val=$('draftText').value;if(!val)return notify('민원 초안을 먼저 작성해 주세요.');try{await navigator.clipboard.writeText(val);notify('민원 초안을 복사했어요.');}catch{notify('복사 권한이 없어요. 내용을 선택해 직접 복사해 주세요.');}});$('downloadDraft').addEventListener('click',()=>{const text=$('draftText').value;if(!text)return notify('민원 초안을 먼저 작성해 주세요.');const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='AirDetective_민원초안.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});$('recommendChannel').addEventListener('click',()=>{if(!state.analysis)return notify('분석 결과를 먼저 만들어 주세요.');recommend(state.analysis);notify('추천 접수처를 표시했어요.');});$('mapMyLocation').addEventListener('click',async()=>{const p=await locate();if(p){showNearestPanel('내 위치 확인 완료','가장 가까운 등록 공사장을 찾으려면 아래 검색 버튼을 눌러 주세요.');}});$('mapFindNearest').addEventListener('click',findNearestConstruction);$('mapShowBoth').addEventListener('click',showBothLocations);$('mapSearchButton').addEventListener('click',async()=>{const q=normalize($('mapSearchQuery').value);if(!q)return notify('지역을 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p,true);}catch(e){notify(e.message);}});$('mapSearchQuery').addEventListener('keydown',e=>{if(e.key==='Enter')$('mapSearchButton').click();});$('refreshMap').addEventListener('click',()=>{repairMapSize();loadMap(true);});document.querySelectorAll('.map-filters input').forEach(i=>i.addEventListener('change',()=>{state.mapLastKey='';loadMap(true);}));}
+
+// ---------- V4.9: searchable start/end and visually distinct corridor construction markers ----------
+function setRouteStatus(message){$('routeStatus').textContent=message;}
+function routeInput(which){return $(which==='start'?'routeStartInput':'routeEndInput');}
+function setRoutePick(which){
+  if(state.route.mode!=='route')setMapMode('route');
+  state.route.pick=which;
+  $('routePickHint').hidden=false;
+  $('routePickHint').textContent=`지도를 클릭하면 ${which==='start'?'출발지':'도착지'}가 선택돼요. (선택 후에는 경로 확인 버튼을 눌러 주세요.)`;
+  $('routePickStart').classList.toggle('picking',which==='start');
+  $('routePickEnd').classList.toggle('picking',which==='end');
+  notify(`${which==='start'?'출발지':'도착지'}로 사용할 지점을 지도에서 클릭하세요.`);
+}
+function clearRoutePick(){
+  state.route.pick=null;
+  $('routePickHint').hidden=true;
+  $('routePickStart').classList.remove('picking');
+  $('routePickEnd').classList.remove('picking');
+}
+function invalidateRouteResult(){
+  state.route.results=null;
+  removeRouteOverlays();
+  $('routeStats').hidden=true;
+  $('routeCount').innerHTML='0 <small>개 등록 지점</small>';
+  $('routeFacilityList').replaceChildren();
+  const empty=document.createElement('p');empty.className='empty-list';
+  empty.textContent='출발지와 도착지를 지정하고 검색하면 여기에 결과가 나와요.';
+  $('routeFacilityList').appendChild(empty);
+  setRouteStatus('경로를 선택한 뒤 「공사장 위치 확인하기」를 눌러 주세요.');
+}
+function setRouteLocation(which,point,label){
+  const dest={lat:point.lat,lon:point.lon,name:label||'지도 선택 위치'};
+  state.route[which]=dest;
+  const inp=routeInput(which);inp.value=label||`${point.lat.toFixed(5)}, ${point.lon.toFixed(5)} (지도 지정)`;
+  invalidateRouteResult();clearRoutePick();
+}
+function handleRouteMapClick(e){
+  const which=state.route.pick;
+  if(state.route.mode!=='route'||!which)return;
+  const pt={lat:e.latlng.lat,lon:e.latlng.lng};
+  if(!inKorea(pt)){notify('현재는 대한민국 내 위치만 선택할 수 있어요.');return;}
+  setRouteLocation(which,pt,`지도 선택 · ${pt.lat.toFixed(5)}, ${pt.lon.toFixed(5)}`);
+  notify(which==='start'?'출발지를 지정했어요.':'도착지를 지정했어요.');
+}
+function removeRouteOverlays(){
+  if(state.map&&state.route.layer&&state.map.hasLayer(state.route.layer))state.map.removeLayer(state.route.layer);
+  state.route.layer=null;state.route.markersGroup=null;
+}
+function setMapMode(mode){
+  const route=mode==='route', m=state.map;
+  state.route.mode=route?'route':'browse';clearRoutePick();
+  $('mapBrowseMode').classList.toggle('active',!route);
+  $('mapRouteMode').classList.toggle('active',route);
+  $('mapBrowseMode').setAttribute('aria-pressed',String(!route));
+  $('mapRouteMode').setAttribute('aria-pressed',String(route));
+  $('mapBrowseControls').hidden=route;
+  $('mapRouteControls').hidden=!route;
+  $('browseSidebar').hidden=route;
+  $('routeSidebar').hidden=!route;
+  $('browseMapKey').hidden=route;
+  $('routeMapKey').hidden=!route;
+  $('mapMyLocation').hidden=route;
+  // There is only ONE Leaflet map. Switching modes never destroys its tile layer.
+  if(!m)return;
+  if(route){
+    if(state.mapFeatureGroup&&m.hasLayer(state.mapFeatureGroup))m.removeLayer(state.mapFeatureGroup);
+    if(state.nearestMarker&&m.hasLayer(state.nearestMarker))m.removeLayer(state.nearestMarker);
+    if(state.nearestLine&&m.hasLayer(state.nearestLine))m.removeLayer(state.nearestLine);
+    if(state.route.results)drawRouteOverlays();
+  }else{
+    removeRouteOverlays();
+    if(state.nearestMarker&&!m.hasLayer(state.nearestMarker))state.nearestMarker.addTo(m);
+    if(state.nearestLine&&!m.hasLayer(state.nearestLine))state.nearestLine.addTo(m);
+    loadMap(false);
+  }
+  requestAnimationFrame(repairMapSize);
+}
+// Equirectangular local metric projection. For route-local visualization only.
+function linePointDistanceMeters(point,a,b){
+  const r=111195,cos=Math.cos(((a.lat+b.lat)/2)*Math.PI/180);
+  const vx=(b.lon-a.lon)*r*cos,vy=(b.lat-a.lat)*r;
+  const wx=(point.lon-a.lon)*r*cos,wy=(point.lat-a.lat)*r;
+  const denom=vx*vx+vy*vy;
+  const t=denom?Math.max(0,Math.min(1,(wx*vx+wy*vy)/denom)):0;
+  return {meters:Math.hypot(wx-t*vx,wy-t*vy),progress:t};
+}
+function corridorPolygon(a,b,radius){
+  const c=Math.max(0.05,Math.cos((a.lat+b.lat)/2*Math.PI/180)),k=111195;
+  const vx=(b.lon-a.lon)*c*k,vy=(b.lat-a.lat)*k;
+  const length=Math.hypot(vx,vy)||1;
+  const dx=-vy/length*radius,dy=vx/length*radius;
+  const offset=(p,sign)=>[p.lat+sign*dy/k,p.lon+sign*dx/(k*c)];
+  return [offset(a,1),offset(b,1),offset(b,-1),offset(a,-1)];
+}
+function makeRouteEndpoint(point,label,kind){
+  const marker=L.marker([point.lat,point.lon],{
+    zIndexOffset:1500,icon:L.divIcon({className:'air-route-endpoint-wrap',
+      html:`<span class="air-route-endpoint ${kind}">${kind==='start'?'A':'B'}</span>`,
+      iconSize:[38,44],iconAnchor:[19,38]})
+  });
+  const popup=document.createElement('div');
+  const title=document.createElement('strong');title.textContent=`${kind==='start'?'출발지':'도착지'} · ${label}`;
+  popup.appendChild(title);marker.bindPopup(popup);return marker;
+}
+function makeRouteWarning(f,offset){
+  const marker=L.marker([f.lat,f.lon],{zIndexOffset:800,
+    icon:L.divIcon({className:'air-route-warning-wrap',
+      html:'<span class="air-route-warning" aria-hidden="true">!</span>',
+      iconSize:[34,38],iconAnchor:[17,33],popupAnchor:[0,-25]})});
+  const popup=document.createElement('div');popup.className='route-popup';
+  const p=document.createElement('p');p.textContent=`직선 구간에서 약 ${kmLabel(offset)} 떨어진 등록 지점 · 실제 공사 진행 여부 미확인`;
+  popup.appendChild(p);popup.appendChild(featureInfo(f));
+  marker.bindPopup(popup,{maxWidth:340});marker.bindTooltip(f.name,{direction:'top',offset:[0,-20]});
+  return marker;
+}
+function drawRouteOverlays(){
+  const m=state.map,r=state.route;
+  if(!m||r.mode!=='route'||!r.results||!r.start||!r.end)return;
+  removeRouteOverlays();
+  const layer=L.layerGroup().addTo(m);
+  r.layer=layer;
+  // Shaded straight-line search corridor, not a road route.
+  L.polygon(corridorPolygon(r.start,r.end,r.radius),{color:'#c15b4c',weight:1,dashArray:'4 5',fillColor:'#df9d91',fillOpacity:.16,interactive:false}).addTo(layer);
+  L.polyline([[r.start.lat,r.start.lon],[r.end.lat,r.end.lon]],{color:'#426d54',weight:4,dashArray:'8 7',opacity:.95,interactive:false}).addTo(layer);
+  makeRouteEndpoint(r.start,r.start.name,'start').addTo(layer);
+  makeRouteEndpoint(r.end,r.end.name,'end').addTo(layer);
+  const hasCluster=typeof L.markerClusterGroup==='function';
+  const group=hasCluster?L.markerClusterGroup({maxClusterRadius:38,disableClusteringAtZoom:17,showCoverageOnHover:false,chunkedLoading:true,
+    iconCreateFunction:c=>{const n=c.getChildCount();return L.divIcon({className:'air-route-cluster-wrap',html:`<span class="air-route-warning-cluster">${n}</span>`,iconSize:[48,48],iconAnchor:[24,24]});}
+  }):L.layerGroup();
+  layer.addLayer(group);r.markersGroup=group;
+  const list=$('routeFacilityList');list.replaceChildren();
+  const markers=[];
+  // Display in the actual start-to-end order (not sorted by latitude or API order).
+  for(const item of r.results){
+    const f=item.facility;
+    const marker=makeRouteWarning(f,item.lineDistance);
+    markers.push(marker);
+    if(markers.length<=150){
+      const row=document.createElement('button');row.type='button';row.className='facility-item route-facility-item';
+      const name=document.createElement('b');name.textContent=`⚑ ${f.name}`;
+      const detail=document.createElement('small');detail.textContent=`시작에서 직선 약 ${kmLabel(item.progress*r.lineLength)} 지점 · 직선까지 ${kmLabel(item.lineDistance)}`;
+      row.append(name,detail);
+      row.addEventListener('click',()=>{
+        m.setView([f.lat,f.lon],Math.max(16,m.getZoom()));
+        if(hasCluster)group.zoomToShowLayer(marker,()=>marker.openPopup());else marker.openPopup();
+      });list.appendChild(row);
+    }
+  }
+  if(markers.length){if(group.addLayers)group.addLayers(markers);else markers.forEach(mk=>group.addLayer(mk));}
+  else{const note=document.createElement('p');note.className='empty-list';note.textContent='선택한 직선 구간 주변에서 공사장으로 등록된 시설을 찾지 못했어요. 미등록·오래된 데이터일 수 있습니다.';list.appendChild(note);}
+  if(r.results.length>150){const more=document.createElement('p');more.className='empty-list';more.textContent=`목록에는 먼저 150개만 표시하지만 지도에는 ${r.results.length.toLocaleString('ko-KR')}개를 모두 표시해요.`;list.appendChild(more);}
+}
+function updateRouteSummary(results,start,end,radius){
+  $('routeCount').replaceChildren(document.createTextNode(`${results.length.toLocaleString('ko-KR')} `));
+  const suffix=document.createElement('small');suffix.textContent='개 등록 지점';$('routeCount').append(suffix);
+  const stats=$('routeStats');stats.replaceChildren();stats.hidden=false;
+  for(const line of [`출발 ↔ 도착 직선거리: ${kmLabel(dist(start,end))}`,`탐색 기준: 직선 양옆 ${radius}m`]){
+    const item=document.createElement('div');item.textContent=line;stats.appendChild(item);
+  }
+  setRouteStatus(results.length?
+    `✅ 직선 구간 주변 등록 공사장 ${results.length.toLocaleString('ko-KR')}곳을 붉게 표시했어요. 빨간 마커나 목록을 눌러 자세히 볼 수 있어요.`:
+    '조회는 완료됐지만 이 직선 구간 주변에 등록된 공사장을 찾지 못했어요. 실제 공사장이 없다는 뜻은 아닙니다.');
+}
+async function buildRouteSearch(){
+  const rawStart=normalize($('routeStartInput').value),rawEnd=normalize($('routeEndInput').value);
+  if(!rawStart||!rawEnd){setRouteStatus('출발지와 도착지를 모두 지정해 주세요.');notify('출발지와 도착지를 먼저 선택해 주세요.');return;}
+  if(routeSearchInProgress)return;
+  routeSearchInProgress=true;
+  const btn=$('routeSearchButton');btn.disabled=true;btn.textContent='⌛ 위치·시설 확인 중…';
+  clearRoutePick();
+  try{
+    setRouteStatus('입력한 장소를 확인하고 있어요…');
+    let a=state.route.start,b=state.route.end;
+    const needsStartLookup=!a;
+    if(!a){a=await geocode(rawStart);state.route.start=a;}
+    if(!b){if(needsStartLookup)await delay(1100);b=await geocode(rawEnd);state.route.end=b;}
+    if(!inKorea(a)||!inKorea(b))throw Error('대한민국 내 위치만 지원합니다.');
+    const length=dist(a,b);
+    if(length<50)throw Error('출발지와 도착지가 너무 가까워요. 50m 이상 떨어진 두 지점을 선택해 주세요.');
+    const radius=Number($('routeRadius').value)||200;
+    setRouteStatus('저장된 공사장 목록에서 직선 주변 지점을 확인하고 있어요…');
+    const sites=await loadFacilityDataset();
+    const latPad=(radius+100)/111195;
+    const lonPad=(radius+100)/(111195*Math.max(.05,Math.cos((a.lat+b.lat)*Math.PI/360)));
+    const latMin=Math.min(a.lat,b.lat)-latPad,latMax=Math.max(a.lat,b.lat)+latPad;
+    const lonMin=Math.min(a.lon,b.lon)-lonPad,lonMax=Math.max(a.lon,b.lon)+lonPad;
+    const selected=[];
+    for(const f of sites){
+      if(f.cat!=='construction'||f.lat<latMin||f.lat>latMax||f.lon<lonMin||f.lon>lonMax)continue;
+      const measure=linePointDistanceMeters(f,a,b);
+      if(measure.meters<=radius){selected.push({facility:f,lineDistance:measure.meters,progress:measure.progress});}
+    }
+    selected.sort((x,y)=>x.progress-y.progress||x.lineDistance-y.lineDistance);
+    state.route.start=a;state.route.end=b;state.route.radius=radius;
+    state.route.lineLength=length;state.route.results=selected;
+    updateRouteSummary(selected,a,b,radius);
+    drawRouteOverlays();
+    state.map.fitBounds([[a.lat,a.lon],[b.lat,b.lon]],{padding:[65,65],maxZoom:15});
+    requestAnimationFrame(repairMapSize);
+  }catch(e){
+    setRouteStatus(`❌ 검색 실패: ${e?.message||'알 수 없는 오류'}`);
+    notify('장소 또는 시설 자료를 확인하지 못했어요.');
+  }finally{routeSearchInProgress=false;btn.disabled=false;btn.textContent='공사장 위치 확인하기 ↗';}
+}
+function bindRouteEvents(){
+  $('mapBrowseMode').addEventListener('click',()=>setMapMode('browse'));
+  $('mapRouteMode').addEventListener('click',()=>setMapMode('route'));
+  $('routePickStart').addEventListener('click',()=>setRoutePick('start'));
+  $('routePickEnd').addEventListener('click',()=>setRoutePick('end'));
+  for(const which of ['start','end'])routeInput(which).addEventListener('input',()=>{
+    state.route[which]=null;invalidateRouteResult();
+  });
+  $('routeStartMyLocation').addEventListener('click',async()=>{
+    try{
+      const geo=await getGeo();
+      if(!inKorea(geo))throw Error('대한민국 내 위치만 지원합니다.');
+      state.userGeo={lat:geo.lat,lon:geo.lon};drawUserMarker();
+      setRouteLocation('start',geo,'내 현재 위치');
+      if(state.map)state.map.setView([geo.lat,geo.lon],Math.max(state.map.getZoom(),13));
+      notify('현재 위치를 출발지로 지정했어요.');
+    }catch(e){notify('위치 권한을 확인하거나 지도에서 출발지를 지정해 주세요.');}
+  });
+  $('routeSwap').addEventListener('click',()=>{
+    const a=state.route.start,b=state.route.end,startInput=$('routeStartInput'),endInput=$('routeEndInput');
+    const startText=startInput.value;startInput.value=endInput.value;endInput.value=startText;
+    state.route.start=b;state.route.end=a;
+    invalidateRouteResult();notify('출발지와 도착지를 바꿨어요.');
+  });
+  $('routeClear').addEventListener('click',()=>{
+    state.route.start=null;state.route.end=null;
+    $('routeStartInput').value='';$('routeEndInput').value='';
+    clearRoutePick();invalidateRouteResult();
+  });
+  $('routeRadius').addEventListener('change',()=>{
+    if(state.route.results&&state.route.start&&state.route.end){
+      // Recalculate from the in-memory dataset without another geocoding/API call.
+      buildRouteSearch();
+    }
+  });
+  $('routeSearchForm').addEventListener('submit',e=>{e.preventDefault();buildRouteSearch();});
+}
+
+function bindEvents(){setupTabs();$('searchLocation').addEventListener('click',async()=>{const q=normalize($('locationQuery').value);if(!q)return notify('지역이나 주소를 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p);notify('지역 정보가 갱신됐어요.');}catch(e){notify(e.message);}});$('locationQuery').addEventListener('keydown',e=>{if(e.key==='Enter'){$('searchLocation').click();}});$('myLocation').addEventListener('click',locate);$('applyLocation').addEventListener('click',()=>{$('siteLocation').value=state.loc.name;notify('현재 조회 위치를 적용했어요.');});$('photoSelect').addEventListener('click',()=>$('photoInput').click());$('photoInput').addEventListener('change',e=>usePhoto(e.target.files[0]));$('removePhoto').addEventListener('click',clearPhoto);$('reportForm').addEventListener('submit',analyze);$('copyDraft').addEventListener('click',async()=>{const val=$('draftText').value;if(!val)return notify('민원 초안을 먼저 작성해 주세요.');try{await navigator.clipboard.writeText(val);notify('민원 초안을 복사했어요.');}catch{notify('복사 권한이 없어요. 내용을 선택해 직접 복사해 주세요.');}});$('downloadDraft').addEventListener('click',()=>{const text=$('draftText').value;if(!text)return notify('민원 초안을 먼저 작성해 주세요.');const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='AirDetective_민원초안.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});$('recommendChannel').addEventListener('click',()=>{if(!state.analysis)return notify('분석 결과를 먼저 만들어 주세요.');recommend(state.analysis);notify('추천 접수처를 표시했어요.');});$('mapMyLocation').addEventListener('click',async()=>{const p=await locate();if(p){showNearestPanel('내 위치 확인 완료','가장 가까운 등록 공사장을 찾으려면 아래 검색 버튼을 눌러 주세요.');}});$('mapFindNearest').addEventListener('click',findNearestConstruction);$('mapShowBoth').addEventListener('click',showBothLocations);$('mapSearchButton').addEventListener('click',async()=>{const q=normalize($('mapSearchQuery').value);if(!q)return notify('지역을 입력해 주세요.');try{const p=await geocode(q);await changeLocation(p,true);}catch(e){notify(e.message);}});$('mapSearchQuery').addEventListener('keydown',e=>{if(e.key==='Enter')$('mapSearchButton').click();});$('refreshMap').addEventListener('click',()=>{repairMapSize();loadMap(true);});document.querySelectorAll('.map-filters input').forEach(i=>i.addEventListener('change',()=>{state.mapLastKey='';loadMap(true);}));bindRouteEvents();}
 window.addEventListener('DOMContentLoaded',()=>{bindEvents();fetchWeather();});

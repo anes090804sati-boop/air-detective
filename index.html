@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f0e7"><meta name="description" content="P-NET 01 Air Detective: 먼지 피해 분석, 무료 사진 분석, 공식 민원 안내, 대기오염 관련 시설 지도">
-  <title>Air Detective V4.7 | P-NET 01</title>
+  <title>Air Detective V4.9 | P-NET 01</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
@@ -73,11 +73,34 @@
         </section>
       </section>
       <section id="mapView" class="view map-view" aria-labelledby="mapTitle" hidden>
-        <div class="map-intro"><div><span class="eyebrow">AIR DETECTIVE / 02 — EXPLORE</span><h1 id="mapTitle">우리나라 주변 <em>오염 가능 시설</em> 살펴보기</h1><p>GitHub에 미리 저장한 국내 OSM 시설 목록에서, 화면 안의 공사장·산업시설·채석장을 즉시 보여줘요. 마커가 겹치면 숫자로 묶어 표시하고, 누르면 펼쳐집니다. 정확한 시설명과 현재 공사 여부는 원본 등록 정보를 확인해 주세요.</p></div><button class="button subtle" id="mapMyLocation">⌖ 내 위치로 이동</button></div>
+        <div class="map-intro"><div><span class="eyebrow">AIR DETECTIVE / 02 — EXPLORE</span><h1 id="mapTitle">우리 동네 <em>공사장과 이동 구간</em> 살펴보기</h1><p>「지도 보기」에서는 기존의 내 주변 공사장 탐색을, 「경로 검색하기」에서는 두 위치를 잇는 직선 근처의 등록 공사장을 찾아볼 수 있어요. 실제 길찾기나 실시간 공사 정보가 아닙니다.</p></div><button class="button subtle" id="mapMyLocation">⌖ 내 위치로 이동</button></div>
+        <nav class="map-modes" aria-label="오염원 지도 기능 선택">
+          <button class="map-mode-button active" type="button" id="mapBrowseMode" aria-pressed="true"><span class="mode-icon">⌖</span><span><strong>지도 보기</strong><small>내 주변 공사장 및 시설</small></span></button>
+          <button class="map-mode-button" type="button" id="mapRouteMode" aria-pressed="false"><span class="mode-icon">⇢</span><span><strong>경로 검색하기</strong><small>출발·도착 사이 공사장 표시</small></span></button>
+        </nav>
+        <div id="mapBrowseControls" class="map-mode-controls">
         <div class="map-toolbar"><div class="map-search"><input id="mapSearchQuery" placeholder="전국 시·군·구 또는 주소 검색 (예: 대구 달서구)" aria-label="지도 위치 검색"><button id="mapSearchButton" type="button" class="small-button">이동</button></div><div class="map-filters" aria-label="표시 시설 유형"><label><input type="checkbox" value="construction" checked> <i class="legend-dot construction"></i> 공사 표기 구역</label><label><input type="checkbox" value="industrial" checked> <i class="legend-dot industrial"></i> 공업·산업시설</label><label><input type="checkbox" value="quarry" checked> <i class="legend-dot quarry"></i> 채석장</label></div></div>
         <div class="map-quick-guide"><div class="map-guide-title">🌿 내 주변 공사장 찾기</div><p>① <b>내 위치 찾기</b>를 누르고 위치 권한을 허용하세요. ② 가장 가까운 <b>공개 지도 등록 공사장</b>이 표시됩니다. ③ 마커나 목록을 누르면 상세 정보를 볼 수 있어요.</p><div class="map-guide-actions"><button id="mapFindNearest" type="button" class="button primary">⌖ 내 위치 · 가장 가까운 공사장 찾기</button><button id="mapShowBoth" type="button" class="small-button outline" disabled>두 지점 함께 보기</button></div></div>
         <section id="nearestPanel" class="nearest-panel" aria-live="polite"><div class="nearest-panel-icon">📍</div><div class="nearest-panel-content"><strong id="nearestTitle">내 위치에서 가장 가까운 공사장</strong><p id="nearestDescription">버튼을 누르면 위치를 확인하고 주변 공사장 등록 지점을 검색해요.</p><small id="nearestNotice">등록 정보가 없거나 최신 정보가 아닐 수 있으며, 공사 진행 여부는 보장되지 않습니다.</small></div></section>
-        <div class="map-layout"><div class="map-frame"><div id="facilityMap" role="application" aria-label="대한민국 공사·산업 시설 탐색 지도"></div><div class="map-key"><span><i class="position-dot"></i> 내 위치</span><span><i class="legend-dot construction"></i> 공사장 표기</span><span><i class="legend-dot industrial"></i> 산업시설</span></div><div class="map-bottom-note">© OpenStreetMap contributors · 위치는 OSM 등록 정보를 반영하며 현장 상태를 보증하지 않습니다.</div></div><aside class="map-sidebar"><div class="sidebar-top"><span class="eyebrow">VISIBLE PLACES</span><h3>화면 내 등록 시설</h3><div class="map-count" id="facilityCount">0 <small>개 장소</small></div><p id="mapStatus" role="status" aria-live="polite">시설 데이터 스냅샷을 만들면 화면 이동에 맞춰 등록 시설이 표시돼요. 숫자 묶음을 클릭하면 개별 장소가 나타나요.</p><button id="refreshMap" type="button" class="small-button outline full">지도 데이터 새로고침 ↻</button></div><div id="facilityList" class="facility-list"><p class="empty-list">이동한 지도 범위의 등록 시설을 불러옵니다.</p></div><div class="map-caution">⚠ <strong>중요</strong><br>OpenStreetMap의 공사 표기는 실제로 현재 진행 중인 공사와 다를 수 있습니다. 등록되지 않은 공사장도 많습니다. 이 지도는 오염원 확정이나 실시간 공사 현황 지도가 아닙니다.</div></aside></div>
+        </div>
+        <section id="mapRouteControls" class="map-mode-controls route-search-panel" hidden aria-labelledby="routeSearchTitle">
+          <div class="route-heading"><span class="eyebrow">ROUTE / CONSTRUCTION WATCH</span><h2 id="routeSearchTitle">출발지에서 도착지까지, 공사장이 있는지 확인해요</h2><p>입력하거나 지도에서 두 지점을 선택하면 그 사이의 <strong>직선 기준</strong> 일정 거리 안에 등록된 공사장을 빨간색으로 표시합니다.</p></div>
+          <form id="routeSearchForm" class="route-search-form" autocomplete="off">
+            <div class="route-field"><label for="routeStartInput"><span class="route-dot start"></span> 출발지</label><input id="routeStartInput" required placeholder="예: 강남역 또는 지도에서 선택"/><div class="route-field-actions"><button type="button" class="small-button outline" id="routeStartMyLocation">⌖ 내 위치</button><button type="button" class="small-button outline" id="routePickStart">지도에서 찍기</button></div></div>
+            <button type="button" class="route-swap" id="routeSwap" title="출발지·도착지 바꾸기" aria-label="출발지 도착지 바꾸기">⇄</button>
+            <div class="route-field"><label for="routeEndInput"><span class="route-dot end"></span> 도착지</label><input id="routeEndInput" required placeholder="예: 역삼역 또는 지도에서 선택"/><div class="route-field-actions"><button type="button" class="small-button outline" id="routePickEnd">지도에서 찍기</button><button type="button" class="small-button outline" id="routeClear">초기화</button></div></div>
+            <div class="route-settings"><label for="routeRadius">직선 주변 탐색 폭</label><select id="routeRadius"><option value="100">양옆 100m</option><option value="200" selected>양옆 200m</option><option value="400">양옆 400m</option><option value="600">양옆 600m</option></select><button id="routeSearchButton" type="submit" class="button primary">공사장 위치 확인하기 ↗</button></div>
+          </form>
+          <p id="routePickHint" class="route-pick-hint" role="status" hidden>지도를 클릭해 위치를 선택하세요.</p>
+          <p class="route-explain">ⓘ 별도 길찾기 API를 쓰지 않으므로 도로를 따라 이동하는 경로가 아닌 <b>두 지점을 잇는 직선</b>입니다. 공사장 표기 정보는 누락되거나 오래되었을 수 있어요.</p>
+        </section>
+        <div class="map-layout"><div class="map-frame"><div id="facilityMap" role="application" aria-label="대한민국 공사·산업 시설 탐색 지도"></div><div class="map-key" id="browseMapKey"><span><i class="position-dot"></i> 내 위치</span><span><i class="legend-dot construction"></i> 공사장 표기</span><span><i class="legend-dot industrial"></i> 산업시설</span></div><div class="map-key route-map-key" id="routeMapKey" hidden><span><i class="route-mini-dot start"></i> 출발</span><span><i class="route-mini-dot end"></i> 도착</span><span><i class="route-mini-dot danger"></i> 직선 주변 등록 공사장</span></div><div class="map-bottom-note">© OpenStreetMap contributors · 등록 시설 위치는 참고용이며 현재 공사 여부는 확인되지 않습니다.</div></div><aside id="browseSidebar" class="map-sidebar"><div class="sidebar-top"><span class="eyebrow">VISIBLE PLACES</span><h3>화면 내 등록 시설</h3><div class="map-count" id="facilityCount">0 <small>개 장소</small></div><p id="mapStatus" role="status" aria-live="polite">시설 데이터 스냅샷을 만들면 화면 이동에 맞춰 등록 시설이 표시돼요. 숫자 묶음을 클릭하면 개별 장소가 나타나요.</p><button id="refreshMap" type="button" class="small-button outline full">지도 데이터 새로고침 ↻</button></div><div id="facilityList" class="facility-list"><p class="empty-list">이동한 지도 범위의 등록 시설을 불러옵니다.</p></div><div class="map-caution">⚠ <strong>중요</strong><br>OpenStreetMap의 공사 표기는 실제로 현재 진행 중인 공사와 다를 수 있습니다. 등록되지 않은 공사장도 많습니다. 이 지도는 오염원 확정이나 실시간 공사 현황 지도가 아닙니다.</div></aside>
+          <aside id="routeSidebar" class="map-sidebar route-sidebar" hidden>
+            <div class="sidebar-top"><span class="eyebrow">ROUTE WATCH / RESULTS</span><h3>직선 구간 주변 공사장</h3><div class="map-count" id="routeCount">0 <small>개 등록 지점</small></div><p id="routeStatus" role="status" aria-live="polite">출발지와 도착지를 입력하거나 지도에서 지정한 다음 검색해 주세요.</p><div id="routeStats" class="route-stats" hidden></div></div>
+            <div id="routeFacilityList" class="facility-list"><p class="empty-list">두 위치를 선택하면 이곳에 공사장 목록이 나타나요.</p></div>
+            <div class="map-caution">⚠ <strong>꼭 확인해 주세요</strong><br>빨간 표시가 실제 오염·통제·공사 진행을 확인했다는 의미는 아닙니다. 두 지점 사이의 직선에 가까운 <b>OSM 등록 공사 지점</b>만 표시해요. 실제 이동 경로는 별도의 길찾기 서비스를 확인하세요.</div>
+          </aside>
+        </div>
       </section>
     </main>
     <footer class="footer"><span>✿ Air Detective · P-NET 01</span><span>OpenStreetMap · Open-Meteo · 브라우저 내 무료 이미지 분석</span></footer>

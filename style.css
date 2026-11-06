@@ -57,3 +57,55 @@
 #mapStatus{background:#eff4ea;border-radius:11px;padding:12px;color:#47654c!important;font-weight:600}
 .facility-item:focus-visible{outline:2px solid #4a8762}
 .map-caution strong{color:#5f5239}
+
+/* V4.9 — one shared map, two clearly separated tasks */
+.map-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 20px}
+.map-mode-button{display:flex;align-items:center;gap:15px;text-align:left;padding:18px 20px;background:#f4f4eb;border:1px solid #e0e7da;border-radius:20px;color:#526a54;min-width:0;transition:border-color .15s,background .15s,transform .15s}
+.map-mode-button:hover{border-color:#a3b9a3;transform:translateY(-1px)}
+.map-mode-button.active{background:linear-gradient(115deg,#dceadb,#f6f1e7);border:2px solid #548369;box-shadow:0 6px 22px #46694f1c;padding:17px 19px;color:#2b523b}
+.map-mode-button .mode-icon{height:46px;width:46px;flex:0 0 46px;display:grid;place-items:center;background:#e6ebe0;border-radius:14px;font-size:24px;font-weight:800}
+.map-mode-button.active .mode-icon{background:#456f52;color:#fff}
+.map-mode-button strong{display:block;font-size:18px;line-height:1.2;margin-bottom:5px}
+.map-mode-button small{display:block;font-size:11px;color:#7b887a}
+.map-mode-controls[hidden],#browseSidebar[hidden],#routeSidebar[hidden]{display:none!important}
+.route-search-panel{border:1px solid #e5e8de;border-radius:22px;padding:24px;margin-bottom:17px;background:linear-gradient(122deg,#f3f7ee,#fffaf0);box-shadow:0 8px 28px #425e4010}
+.route-heading h2{font-size:22px;line-height:1.4;color:#385742;margin:6px 0 4px;letter-spacing:-.4px}
+.route-heading p{margin:0;color:#71806f;font-size:12px}
+.route-search-form{display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);align-items:end;gap:12px;margin:18px 0 0}
+.route-field{min-width:0}.route-field>label{display:flex;align-items:center;gap:8px;font-weight:800;color:#3d5a43;font-size:13px;margin:0 0 7px}
+.route-field>input{width:100%;height:48px;background:#fffefa}
+.route-dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#40865c;border:2px solid #fff;box-shadow:0 0 0 2px #40865c}
+.route-dot.end{background:#a8794b;box-shadow:0 0 0 2px #a8794b}
+.route-field-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.route-field-actions .small-button{font-size:11px;padding:7px 11px;min-height:32px}
+.route-field-actions .small-button.picking{background:#35654c;color:#fff;border-color:#35654c}
+.route-swap{width:44px;height:48px;background:#e1ebe0;color:#3e694e;font-size:23px;border:1px solid #c8d8c9;border-radius:12px;margin-bottom:39px}
+.route-settings{grid-column:1/-1;display:flex;gap:12px;align-items:center;justify-content:flex-end;padding-top:7px;border-top:1px solid #e3e7dd;flex-wrap:wrap}
+.route-settings label{font-weight:700;font-size:12px;color:#506f56}
+.route-settings select{width:150px}
+.route-settings .button{padding:12px 18px;min-height:44px}
+.route-settings .button:disabled{opacity:.6;cursor:wait}
+.route-pick-hint{background:#436f50;color:#fff;padding:11px 15px;border-radius:11px;font-size:12px;font-weight:700;margin:15px 0 0}
+.route-explain{font-size:11px;color:#807e70;margin:15px 0 0;line-height:1.8}
+.route-sidebar{border-color:#e3d9cd}
+.route-sidebar .sidebar-top h3{color:#725543}
+.route-sidebar .map-count{color:#bb554d}
+.route-stats{margin-top:10px;padding:11px;border-radius:12px;background:#f6f2e9;font-size:11px;font-weight:700;color:#6d775d;line-height:1.9}
+.route-facility-item{border-left:3px solid #c65b4e!important}
+.route-facility-item b{color:#9c4d45}
+.route-popup>p{color:#ab564a;font-weight:700;font-size:11px;line-height:1.6;margin:0 0 9px}
+.air-facility-icon,.air-route-warning-wrap,.air-route-endpoint-wrap,.air-route-cluster-wrap{background:transparent;border:0}
+.air-facility-pin{display:grid;place-items:center;font-size:19px;width:36px;height:36px;border-radius:14px 14px 14px 4px;background:#9b754d;border:3px solid #fffdf5;box-shadow:0 4px 14px #3d42275b;cursor:pointer}
+.air-facility-pin.industrial{background:#618073}
+.air-facility-pin.quarry{background:#b7a46d}
+.air-route-warning{display:grid;place-items:center;width:32px;height:32px;background:#cc4f47;color:#fff;border:3px solid white;border-radius:50% 50% 50% 10%;box-shadow:0 5px 16px #7a28266e;font-size:18px;font-family:Arial,sans-serif;font-weight:900;cursor:pointer}
+.air-route-warning-cluster{display:grid;place-items:center;width:46px;height:46px;background:#b8453e;color:white;border:4px solid #fff;border-radius:50%;box-shadow:0 5px 17px #94372d82;font-weight:900;font-size:16px}
+.air-route-endpoint{display:grid;place-items:center;width:36px;height:36px;border-radius:50% 50% 50% 5px;border:3px solid #fff;color:#fff;font-weight:900;font-size:15px;box-shadow:0 3px 15px #3353417d;background:#37835c}
+.air-route-endpoint.end{background:#ad7c4e}
+@media(max-width:900px){.route-search-form{grid-template-columns:1fr 42px 1fr}.route-settings{justify-content:flex-start}}
+@media(max-width:640px){.map-modes{gap:8px}.map-mode-button{gap:9px;padding:13px 10px;border-radius:14px}.map-mode-button.active{padding:12px 9px}.map-mode-button .mode-icon{height:35px;width:35px;flex-basis:35px;border-radius:10px;font-size:18px}.map-mode-button strong{font-size:13px}.map-mode-button small{font-size:9px}.route-search-panel{padding:16px}.route-heading h2{font-size:18px}.route-search-form{display:flex;flex-direction:column;align-items:stretch;gap:12px}.route-swap{margin:0 auto;width:42px;height:37px;transform:rotate(90deg)}.route-settings{display:grid;grid-template-columns:1fr auto;gap:8px}.route-settings .button{grid-column:1/-1}.route-settings select{width:140px}.route-field-actions .small-button{flex:1}.route-sidebar{max-height:none}}
+
+.route-map-key{background:#fffaf6f5}
+.route-mini-dot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#397e55;border:2px solid white;box-shadow:0 0 0 2px #397e55}
+.route-mini-dot.end{background:#ac7849;box-shadow:0 0 0 2px #ac7849}
+.route-mini-dot.danger{background:#c64f47;box-shadow:0 0 0 2px #c64f47}
